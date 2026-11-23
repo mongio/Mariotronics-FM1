@@ -6,7 +6,7 @@ Mariotronics turns the FM-1 into a playable guitar and tape-delay instrument ins
 
 ## Try it
 
-[Download the standalone editor and emulator](https://github.com/mongio/Mariotronics-FM1/raw/refs/heads/main/downloads/Mariotronics_0_1.html). Open the downloaded HTML in desktop Chrome or Edge and click **Power on**. The emulator works offline. Hold REC for 1.2 seconds to erase the tape. Powering off clears the tape in RAM.
+[Download the standalone editor and emulator (ZIP)](https://raw.githubusercontent.com/mongio/Mariotronics-FM1/main/downloads/Mariotronics_Editor_FM1.zip). Extract the ZIP, open **Mariotronics_0_1.html** in desktop Chrome or Edge and click **Power on**. The emulator works offline. Hold REC for 1.2 seconds to erase the tape. Powering off clears the tape in RAM.
 
 ## Install on FM-1
 
