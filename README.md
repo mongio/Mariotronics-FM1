@@ -1,6 +1,6 @@
 # Mariotronics for M-VAVE FM-1
 
-Mariotronics turns the FM-1 into a playable guitar and tape-delay instrument inspired by Frippertronics. Two animated Revox A77s show the tape moving between the record and playback heads.
+Mariotronics turns the FM-1 into a playable guitar and tape-delay instrument inspired by Frippertronics. On power-up, the MTXT logo sits inside the left reel while a yellow cursor makes two passes around the feedback loop. The lowercase italic *mariotronics* title fades in beneath it. Two animated Revox A77s show the tape moving between the record and playback heads.
 
 **0.1 pre-release · Tested in emulation.** Installation, audio performance and BLE pairing on a physical FM-1 await verification.
 

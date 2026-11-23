@@ -556,75 +556,50 @@ static void effect_display(void) {
 }
 static unsigned intro_start;
 static int intro;
-static void boot_image(const unsigned char *pixels,int w,int h,int x,int y,int glow,int logo) {
-  uint16_t color[16];
-  for(int i=0;i<16;i++) {
-    int level=i*glow/15;
-    color[i]=swap16(logo?RGB(level,level*86/100,level*66/100):RGB(level*53/100,level,level*91/100));
-  }
-  for(int j=0;j<h;j++)for(int i=0;i<w;i+=2){
-    unsigned pair=pixels[(j*w+i)/2];
-    cv_px[(j+y)*240+x+i]=color[pair>>4];
-    cv_px[(j+y)*240+x+i+1]=color[pair&15];
-  }
+enum { INTRO_END_MS = 5600 };
+static unsigned intro_ease(unsigned elapsed,unsigned duration) {
+  if(elapsed>=duration)return 255;
+  unsigned x=elapsed*255/duration;
+  return x*x*(765-2*x)/65025;
 }
 static void boot_draw(unsigned ms) {
-  enum { FADE_START=450, CROSSFADE=600, STILL_AT=2600, HOLD_MS=500, OUT_MS=240 };
-  unsigned motion=ms>STILL_AT?STILL_AT:ms;
-  int fade=bound((int)(STILL_AT+HOLD_MS+OUT_MS-ms)*255/OUT_MS,0,255);
-  int cross=bound(((int)ms-FADE_START)*255/CROSSFADE,0,255);
-  cv_begin(240,47,0);cv_blit(0,0);
-  cv_begin(240,146,0);
-  boot_image(boot_diagram,232,136,4,5,cross*fade/255,0);
-  if(cross==255) {
-  /* Nodes follow the supplied delay-return drawing at its LCD scale. */
-  const int path[][2]={{10,9},{62,9},{64,85},{175,85},{175,9},{73,9},{73,85},{175,85}};
-  unsigned t=(motion-1050)*290/1000;
-  for(unsigned i=1;i<sizeof path/sizeof path[0];i++){
-    int dx=path[i][0]-path[i-1][0],dy=path[i][1]-path[i-1][1];
-    unsigned len=absolute(dx)+absolute(dy);
-    if(t<len){int x=path[i-1][0]+dx*(int)t/(int)len,y=path[i-1][1]+dy*(int)t/(int)len;
-      disc(x,y,4,RGB(fade*183/255,fade*110/255,fade*20/255));disc(x,y,2,RGB(fade,fade*225/255,fade*112/255));break;}t-=len;
+  unsigned brightness=intro_ease(ms,650)*(255-intro_ease(ms>5000?ms-5000:0,550))/255;
+  unsigned title=brightness*intro_ease(ms>3500?ms-3500:0,550)/255;
+  uint16_t colors[128],letters[128];
+  for(unsigned i=0;i<128;i++){
+    const unsigned char *c=intro_palette+3*i;
+    colors[i]=swap16(RGB(c[0]*brightness/255,c[1]*brightness/255,c[2]*brightness/255));
+    letters[i]=swap16(RGB(c[0]*title/255,c[1]*title/255,c[2]*title/255));
   }
-  /* Sweep a highlight over the ink of the take-up spiral. */
-  unsigned phase=motion*3200000u;
-  int ax=sinus(phase),ay=sinus(phase+0x40000000u);
-  for(int dy=-19;dy<=19;dy++)for(int dx=-19;dx<=19;dx++){
-    int x=209+dx,y=38+dy;
-    if(dx*dx+dy*dy>355 || dx*ax+dy*ay<0 || absolute(dx*ay-dy*ax)>320)continue;
-    int i=(y-5)*232+x-4;unsigned pair=boot_diagram[i/2];
-    unsigned shade=(i&1)?pair&15:pair>>4;
-    if(shade>7)cv_px[y*240+x]=swap16(RGB(fade,fade*224/255,fade*115/255));
-  }
-  }
-  if(cross<255) {
-    for(int y=0;y<41;y++)for(int x=0;x<LOGO_WIDTH;x++){
-      int i=y*LOGO_WIDTH+x, pair=boot_logo[i/2], alpha=((i&1)?pair&15:pair>>4)*(255-cross)/15;
-      if(!alpha)continue;
-      uint16_t *dst=&cv_px[(y+52)*240+(240-LOGO_WIDTH)/2+x];
-      unsigned bg=swap16(*dst),inv=255-alpha;
-      unsigned r=((bg>>11)*8*inv+255*alpha)/255;
-      unsigned g=(((bg>>5)&63)*4*inv+216*alpha)/255;
-      unsigned b=((bg&31)*8*inv+155*alpha)/255;
-      *dst=swap16(RGB(r,g,b));
+  cv_begin(240,52,0);cv_blit(0,0);
+  cv_begin(240,136,0);
+  for(unsigned i=0;i<240*136;i++)cv_px[i]=colors[intro_art[i]];
+  /* Closed return path in local LCD coordinates, clockwise from the record head. */
+  const int route[][2]={{75,79},{170,79},{172,77},{172,10},{170,8},{78,8},{75,11},{75,79}};
+  enum { PATH_LENGTH=95+4+67+4+92+6+68 };
+  unsigned clock=ms<4500?ms:4500;
+  int head=(clock%2250)*PATH_LENGTH/2250;
+  for(int trail=5;trail>=0;trail--){
+    int pos=(head+PATH_LENGTH-trail)%PATH_LENGTH;
+    for(unsigned i=1;i<sizeof route/sizeof route[0];i++){
+      int dx=route[i][0]-route[i-1][0],dy=route[i][1]-route[i-1][1];
+      int len=absolute(dx)+absolute(dy);
+      if(pos<len){
+        int x=route[i-1][0]+dx*pos/len,y=route[i-1][1]+dy*pos/len;
+        disc(x,y,trail?1:2,RGB((255-20*trail)*brightness/255,(231-20*trail)*brightness/255,66*brightness/255));
+        break;
+      }
+      pos-=len;
     }
   }
-  cv_blit(0,47);cv_begin(240,47,0);
-  for(int letter=0;letter<12;letter++) {
-    int progress=bound(((int)motion-1150-letter*115)*255/185,0,255);
-    if(!progress)break;
-    int baseline=8+(255-progress)*5/255;
-    for(int x=title_edges[letter];x<title_edges[letter+1];x++)for(int y=0;y<22;y++){
-      int i=y*224+x,pair=boot_title[i/2],shade=(i&1)?pair&15:pair>>4;
-      int v=shade*progress*fade/(15*255);
-      cv_px[(baseline+y)*240+(240-title_edges[12])/2+x]=swap16(RGB(v,v*86/100,v*65/100));
-    }
-  }
-  cv_blit(0,193);
+  cv_blit(0,52);
+  cv_begin(240,52,0);
+  for(unsigned i=0;i<240*22;i++)cv_px[i]=letters[intro_art[240*136+i]];
+  cv_blit(0,188);
 }
 
 static void draw(void) {
-  if(intro && fm1_ms-intro_start<3340){boot_draw(fm1_ms-intro_start);return;}intro=0;
+  if(intro && fm1_ms-intro_start<INTRO_END_MS){boot_draw(fm1_ms-intro_start);return;}intro=0;
   static const char *const modes[] = {"STOP", "REC", "DUB", "HOLD"};
   unsigned t = transport;
   cv_begin(240, 146, 0);
@@ -931,7 +906,7 @@ static void app_step(void) {
   if(bt_lost){bt_lost=0;for(int ch=0;ch<16;ch++)for(int n=0;n<128;n++)midi_input(1,128+ch,n,0);}
 #endif
   if(!knob[MIDI][2] || (last_tick && fm1_ms-last_tick>1000)){last_tick=ticks=beat_ms=0;}
-  if (fm1_ms - last_frame >= 80) {
+  if (fm1_ms - last_frame >= (intro ? 33u : 80u)) {
     last_frame = fm1_ms;
     draw();
     fm1_led_key(BTN_REC, transport == RECORD || transport == DUB);
