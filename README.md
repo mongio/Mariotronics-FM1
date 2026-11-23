@@ -1,0 +1,25 @@
+# Mariotronics for M-VAVE FM-1
+
+Mariotronics turns the FM-1 into a playable guitar and tape-delay instrument inspired by Frippertronics. Two animated Revox A77s show the tape moving between the record and playback heads.
+
+**0.1 pre-release · Tested in emulation.** Installation, audio performance and BLE pairing on a physical FM-1 await verification.
+
+## Try it
+
+[Download the standalone editor and emulator](https://github.com/mongio/Mariotronics-FM1/raw/refs/heads/main/downloads/Mariotronics_0_1.html). Open the downloaded HTML in desktop Chrome or Edge and click **Power on**. The emulator works offline. Hold REC for 1.2 seconds to erase the tape. Powering off clears the tape in RAM.
+
+## Install on FM-1
+
+Connect one powered FM-1 with a USB data cable. Open the downloaded editor, select **Install Mariotronics**, and grant MIDI SysEx access. Installation replaces the existing firmware. Leave power and USB connected until the editor reports **Installed · FM-1_841**.
+
+[Download the firmware package](https://github.com/mongio/Mariotronics-FM1/raw/refs/heads/main/downloads/mariotronics-0.1.fwsc).
+
+## Play
+
+- **EDIT** selects Sing or Hollow. **ENV** shapes the guitar envelope.
+- **LFO** sets vibrato rate, depth, delay and rise. **ARP** alternates two held notes with a 3+3+2 accent.
+- **REC** records and overdubs. **SAVE** reverses a recorded loop. In Tape mode, **ALGORITHM** changes the delay.
+- **FX** opens compression, fuzz, wah, amplifier and stereo plate. The plate follows the tape return, so its tail stays out of the recording.
+- **GLO** opens MIDI and Bluetooth MIDI. The editor includes the CC assignments and transport instructions.
+
+[Build instructions](MARIOTRONICS.md) · [License](LICENSE) · [Third-party credits](LICENSING.md)
