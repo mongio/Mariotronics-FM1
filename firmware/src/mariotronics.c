@@ -27,18 +27,18 @@
 static int16_t tape[CAPACITY] POOLMEM;
 enum { STOP, RECORD, DUB, HOLD };
 enum { SINGING = 4, HOLLOW = 5 };
-enum { HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, MIDI, BT, ARP, PAGE_COUNT };
-static const char *const pages[] = {"TAPE", "GUITAR", "PHRASING", "FUZZ", "SCALES", "WAH", "AMP", "PLATE", "ENV","COMP","LFO","MIDI","BLE MIDI","ARP"};
+enum { HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, MIDI, BT, ARP, OFF_TAPE, PAGE_COUNT };
+static const char *const pages[] = {"TAPE", "GUITAR", "PHRASING", "FUZZ", "SCALES", "WAH", "AMP", "PLATE", "ENV","COMP","LFO","MIDI","BLE MIDI","ARP","OFF-TAPE"};
 static const char *const names[][4] = {{"SWELL", "FDBK", "SEND", "RETURN"},
                                        {"VOICE", "DRIVE", "TAPE", "MODE"},
-                                       {"GLISS", "MS", "CENT", "HZ"}, {"DRIVE","TONE","BIAS","MIX"}, {"MODE","ROOT"}, {"SWEEP","RES","TONE","MIX"}, {"GAIN","BASS","TREBLE","VOL"}, {"MIX","DECAY","DAMP","PRE ms"}, {"A ms","D ms","S %","R ms"},{"THRESH","RATIO","REL ms","GAIN"},{"HZ","CENT","WAIT ms","RISE ms"},{"RX CH","CC IN","SYNC","BEATS"},{"RADIO","DEVICE"},{"PLAY","HZ","GATE %","ACCENT"}};
+                                       {"GLISS", "MS", "CENT", "HZ"}, {"DRIVE","TONE","BIAS","MIX"}, {"MODE","ROOT"}, {"SWEEP","RES","TONE","MIX"}, {"GAIN","BASS","TREBLE","VOL"}, {"MIX","DECAY","DAMP","PRE ms"}, {"A ms","D ms","S %","R ms"},{"THRESH","RATIO","REL ms","GAIN"},{"HZ","CENT","WAIT ms","RISE ms"},{"RX CH","CC IN","SYNC","BEATS"},{"RADIO","DEVICE"},{"PLAY","HZ","GATE %","ACCENT"},{"LEVEL %"}};
 static volatile int knob[][4] = {
-    {38, 81, 80, 72}, {0, 55, 3, 0}, {1, 24, 22, 5}, {54,45,18,42}, {0,6}, {40,52,60,0}, {32,48,42,85}, {19,72,52,18}, {38,32,84,36},{46,2,40,12},{5,22,12,20},{0,1,0,8},{0,0},{0,9,72,38}};
+    {38, 81, 80, 72}, {0, 55, 3, 0}, {1, 24, 22, 5}, {54,45,18,42}, {0,6}, {40,52,60,0}, {32,48,42,85}, {19,72,52,18}, {38,32,84,36},{46,2,40,12},{5,22,12,20},{0,1,0,8},{0,0},{0,9,72,38},{25}};
 static const int maximum[][4] = {{100, 100, 100, 100},
                                  {1, 100, 7, 1},
                                  
-                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8},{1,16,95,100}};
-static const int minimum[][4] = {{0}, {0}, {0, 1, 0, 2}, {0}, {0},{0},{0},{0},{0},{0,1,0,0},{2,0,0,0},{0,0,0,1},{0},{0,3,20,0}};
+                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8},{1,16,95,100},{100}};
+static const int minimum[][4] = {{0}, {0}, {0, 1, 0, 2}, {0}, {0},{0},{0},{0},{0},{0,1,0,0},{2,0,0,0},{0,0,0,1},{0},{0,3,20,0},{0}};
 static const char *const voices[] = {"SING", "HOLLOW"};
 static const char *const mode_names[] = {"CHROM", "DORIAN", "MAJOR"};
 static const char *const tonic_names[] = {"C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"};
@@ -246,6 +246,25 @@ static int string_tick(String *s) {
   return (picked * s->level) >> 15;
 }
 static int dec_sum, dec_n, prev_return, next_return, tape_lp, amp_lp;
+/* First A77 playback head, 180 ms downstream of the record head. */
+#define HEAD_SAMPLES (TAPE_RATE * 180u / 1000u)
+static int16_t head_history[HEAD_SAMPLES] POOLMEM;
+static unsigned head_index, head_count;
+static int head_previous, head_filtered;
+
+static void reset_head(void) {
+  head_index = head_count = 0;
+  head_previous = head_filtered = 0;
+}
+
+static void advance_head(int recorded) {
+  int sample = head_count == HEAD_SAMPLES ? head_history[head_index] : 0;
+  if (head_count < HEAD_SAMPLES) head_count++;
+  head_history[head_index] = recorded;
+  if (++head_index == HEAD_SAMPLES) head_index = 0;
+  head_previous = head_filtered;
+  head_filtered += (sample - head_filtered) * 3 / 4;
+}
 static volatile unsigned reverse, loop_mode, beat_ms;
 static unsigned beat_length(void) {return beat_ms && knob[MIDI][2] ? (unsigned)bound((int)(beat_ms*knob[MIDI][3]*147u/10u),TAPE_RATE/4,CAPACITY) : (knob[SOUND][2]+1)*TAPE_RATE;}
 static void rec_command(void) {
@@ -274,12 +293,15 @@ static void play_command(void) {
     rec_command();
     if (transport == DUB)
       transport = HOLD;
-  } else if (transport != STOP)
+  } else if (transport != STOP) {
     transport = STOP;
+    reset_head();
+  }
   else if (has_loop)
     transport = HOLD;
 }
 static void erase_loop(void) {
+  reset_head();
   reverse = loop_mode = 0;
   valid_samples = 0;
   transport = STOP;
@@ -410,8 +432,11 @@ static void app_audio(int32_t *out, uint32_t n) {
           tape_lp += (old - tape_lp) * 3 / 4;
           int write = dec_sum / 3 + tape_lp * knob[HOME][1] / 100;
           tape[position] = (int16_t)bound(write, -30000, 30000);
+          advance_head(tape[position]);
           if (position == valid_samples)
             valid_samples++;
+        } else {
+          advance_head(0);
         }
         dec_sum = 0;
         if (reverse && transport == HOLD) {
@@ -430,7 +455,8 @@ static void app_audio(int32_t *out, uint32_t n) {
     }
     if (absolute(ret) > peak_out)
       peak_out = absolute(ret);
-    int mix = dry + ret * knob[HOME][3] / 100;
+    int head = head_previous + (head_filtered - head_previous) * dec_n / 3;
+    int mix = dry + ret * knob[HOME][3] / 100 + head * knob[OFF_TAPE][0] / 100;
     if (plate_half) plate_tick((plate_input+mix)/4,decay,damping,predelay);
     plate_input=mix;
     int l=plate_half?(wet_l+prev_l)/2:wet_l;
@@ -604,7 +630,14 @@ static void draw(void) {
   unsigned t = transport;
   cv_begin(240, 146, 0);
   if(page==FUZZ || page==WAH || page==AMP || page==PLATE || page==ENV || page==COMP) effect_display();
-  else if(page==ARP) {
+  else if(page==OFF_TAPE) {
+    lettering(120,12,"OFF-TAPE MONITOR",gold,0);
+    cv_line(40,95,200,95,silver);
+    cv_line(67,95,67,47,silver);
+    cv_line(167,95,167,95-knob[OFF_TAPE][0]*48/100,gold);
+    lettering(67,103,"DRY",silver,0);
+    lettering(167,103,"180 ms",gold,0);
+  } else if(page==ARP) {
     lettering(120,16,"TWO-NOTE PICKING",gold,0);
     for(int i=0;i<8;i++){
       int x=22+i*28,y=(i&1)?62:84;
@@ -667,6 +700,7 @@ static void draw(void) {
   cv_rect(6, 19, 228, 2, metal);
   cv_rect(6, 19, width, 2, gold);
   for (int k = 0; k < 4; k++) {
+    if (page == OFF_TAPE && k > 0) break;
     if ((page == SCALE || page == BT) && k >= 2) break;
     int x = (page == SCALE || page == BT) ? 60 + 120 * k : 30 + 60 * k;
     int v = knob[page][k], lo = minimum[page][k], hi = maximum[page][k];
@@ -868,7 +902,7 @@ static void app_step(void) {
   if (edge & (1u << BTN_PLAY))
     post(EV_PLAY, 0, 0);
   if (edge & (1u << BTN_FX))
-    page = page==COMP ? FUZZ : page==FUZZ ? WAH : page==WAH ? AMP : page==AMP ? PLATE : COMP;
+    page = page==COMP ? FUZZ : page==FUZZ ? WAH : page==WAH ? AMP : page==AMP ? OFF_TAPE : page==OFF_TAPE ? PLATE : COMP;
   if (edge & (1u << BTN_ENV)) page = ENV;
   int d = fm1_enc_take(ENC_SELECT);
   if(d)intro=0;

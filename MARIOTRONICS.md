@@ -11,9 +11,11 @@ EDIT opens Guitar. LFO adjusts rate, depth, wait and rise. SEQ switches vibrato.
 On Linux x86-64, use the JieLi toolchain and AC79 SDK for the firmware, and clang with wasm-ld for the emulator. Set JIELI_TOOLCHAIN and AC79_SDK before building.
 
 ```sh
-./build.sh --release 0.1
+./build.sh --release 0.2
 clang --target=wasm32 -O2 -ffreestanding -nostdlib -fno-builtin -DGRANA_WEB -Ifirmware/src -Ifirmware/gen -Wl,--no-entry -Wl,--export-memory -Wl,-z,stack-size=262144 -Wl,--initial-memory=16777216 -o web/mariotronics.wasm firmware/src/mariotronics.c
 python3 web/make_mariotronics.py
 ```
 
 The FM-1 platform, USB/TRS MIDI and BLE central derive from VIRGO, GRANA, Felucca and Optimist. The guitar excitation and pickup derive from De-Pattern/Ravel_FM1 GUITAR. The Revox A77 display and MTXTronics intro use supplied reference artwork. See LICENSE, LICENSING.md and individual files for credits.
+
+**Off-Tape Monitor.** Press FX until OFF-TAPE appears. K1 sets the level (0–100%, default 25%). In REC and DUB, the first head reads the newly written tape after 180 ms. Its level affects the monitor mix feeding the final plate.
