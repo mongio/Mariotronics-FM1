@@ -2,17 +2,17 @@
 
 Mariotronics turns the FM-1 into a playable guitar and tape-delay instrument inspired by Frippertronics. On power-up, the MTXT logo sits inside the left reel while a yellow cursor makes two passes around the feedback loop. The lowercase italic *mariotronics* title fades in beneath it. Two animated Revox A77s show the tape moving between the record and playback heads.
 
-**1.3 pre-release · Tested in emulation.** Installation, audio performance and BLE pairing on a physical FM-1 await verification.
+**1.4 pre-release · Tested in emulation.** Installation, audio performance and BLE pairing on a physical FM-1 await verification.
 
 ## Try it
 
-[Download the standalone editor and emulator (ZIP)](https://raw.githubusercontent.com/mongio/Mariotronics-FM1/main/downloads/Mariotronics_Editor_FM1.zip). Extract the ZIP, open **Mariotronics_1_3.html** in desktop Chrome or Edge and click **Power on**. The emulator works offline. Hold REC for 1.2 seconds to erase the tape. Powering off clears the tape in RAM.
+[Download the standalone editor and emulator (ZIP)](https://raw.githubusercontent.com/mongio/Mariotronics-FM1/main/downloads/Mariotronics_Editor_FM1.zip). Extract the ZIP, open **Mariotronics_1_4.html** in desktop Chrome or Edge and click **Power on**. The emulator works offline. Hold REC for 1.2 seconds to erase the tape. Powering off clears the tape in RAM.
 
 ## Install on FM-1
 
-Connect one powered FM-1 with a USB data cable. Open the downloaded editor, select **Install Mariotronics**, and grant MIDI SysEx access. Installation replaces the existing firmware. Leave power and USB connected until the editor reports **Installed · FM-1_853**.
+Connect one powered FM-1 with a USB data cable. Open the downloaded editor, select **Install Mariotronics**, and grant MIDI SysEx access. Installation replaces the existing firmware. Leave power and USB connected until the editor reports **Installed · FM-1_854**.
 
-[Download the firmware package](https://github.com/mongio/Mariotronics-FM1/raw/refs/heads/main/downloads/mariotronics-1.3.fwsc).
+[Download the firmware package](https://github.com/mongio/Mariotronics-FM1/raw/refs/heads/main/downloads/mariotronics-1.4.fwsc).
 
 ## Play
 
@@ -37,3 +37,5 @@ Connect one powered FM-1 with a USB data cable. Open the downloaded editor, sele
 **Pre-tape tone controls.** FX cycles through Comp, Fuzz, Wah, Amp, EQ, Filter, Off-Tape and Plate. EQ has low and high shelves (180 Hz and 4.2 kHz) and a sweepable mid band (250 Hz to 4 kHz), all ±12 dB. Filter offers Off, LP and HP, cutoff 40 Hz to 16 kHz, resonance and mix. Neutral by default, recalled per preset and per live engine.
 
 In FRIPP, press SEL through Phrasing and Scales to reach Pick Art. Wait delays the first pick and Rise fades in the phrase (0–1000 ms each). Legato connects each pair with one pick. Semi sets the second note 0–24 semitones above a single held key, snapped to the selected scale. Hold two keys for your own interval. Phrasing Time sets the slide duration for about a fifth; smaller intervals arrive sooner.
+
+EDIT shows a triggered pre-effects voice scope. GLO shows output VU and peak after plate and master. HOME keeps the tape display. FRIPP ARP opens the interval view; press ARP again for Pick Art. K1 on the ARP rate page switches picking on or off. SEL also opens Pick Art. The startup animation shows the mariotronics wordmark.

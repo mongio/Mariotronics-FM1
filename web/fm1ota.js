@@ -187,9 +187,9 @@ export class Updater {
   }
 
   // full install: running firmware -> loader -> new firmware
-  async install(image, product, onStep) {
+  async install(image, product, onStep, identified = null) {
     const step = onStep || (() => {});
-    const dev = await this.find((id) => !IS_OTA(id));
+    const dev = identified || await this.find((id) => !IS_OTA(id));
     if (!dev) throw fail("notfound", "FM-1 not found (USB cable, and no other app using it?)");
     const [model] = product.split("_");
     if (dev.id.model !== model) { dev.link.close(); throw fail("model", `the device is ${dev.id.text}, the package is for ${product}`); }
@@ -225,9 +225,9 @@ export class Updater {
   }
 
   // resume: the device is already in update mode (loader) -> true when the write finished
-  async resume(image, onStep, product = null) {
+  async resume(image, onStep, product = null, identified = null) {
     const model = product && product.split("_")[0];
-    const ota = await this.find((id) => model ? id.model === "ota-" + model : IS_OTA(id));
+    const ota = identified || await this.find((id) => model ? id.model === "ota-" + model : IS_OTA(id));
     if (!ota) return false;
     const step = onStep || (() => {});
     const result = await this.write(ota, image, step);

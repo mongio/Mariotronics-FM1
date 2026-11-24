@@ -11,7 +11,7 @@ EDIT opens Instrument. LFO adjusts rate, depth, wait and rise. Press LFO again o
 On Linux x86-64, use the JieLi toolchain and AC79 SDK for the firmware, and clang with wasm-ld for the emulator. Set JIELI_TOOLCHAIN and AC79_SDK before building.
 
 ```sh
-./build.sh --release 1.3
+./build.sh --release 1.4
 clang --target=wasm32 -O2 -ffreestanding -nostdlib -fno-builtin -DGRANA_WEB -Ifirmware/src -Ifirmware/gen -Wl,--no-entry -Wl,--export-memory -Wl,-z,stack-size=262144 -Wl,--initial-memory=16777216 -o web/mariotronics.wasm firmware/src/mariotronics.c
 python3 web/make_mariotronics.py
 ```
@@ -31,3 +31,5 @@ The FM-1 platform, USB/TRS MIDI and BLE central derive from VIRGO, GRANA, Felucc
 **Pre-tape tone controls.** FX cycles through Comp, Fuzz, Wah, Amp, EQ, Filter, Off-Tape and Plate. EQ has low and high shelves (180 Hz and 4.2 kHz) and a sweepable mid band (250 Hz to 4 kHz), all ±12 dB. Filter offers Off, LP and HP, cutoff 40 Hz to 16 kHz, resonance and mix. Neutral by default, recalled per preset and per live engine.
 
 In FRIPP, press SEL through Phrasing and Scales to reach Pick Art. Wait delays the first pick and Rise fades in the phrase (0–1000 ms each). Legato connects each pair with one pick. Semi sets the second note 0–24 semitones above a single held key, snapped to the selected scale. Hold two keys for your own interval. Phrasing Time sets the slide duration for about a fifth; smaller intervals arrive sooner.
+
+EDIT shows a triggered pre-effects voice scope. GLO shows output VU and peak after plate and master. HOME keeps the tape display. FRIPP ARP opens the interval view; press ARP again for Pick Art. K1 on the ARP rate page switches picking on or off. SEL also opens Pick Art. The startup animation shows the mariotronics wordmark.

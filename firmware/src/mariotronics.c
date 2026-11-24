@@ -509,6 +509,8 @@ static void phrase_event(int note,int velocity) {
     if(phrase_size)phrase_start();
   }
 }
+static volatile unsigned pick_display, pick_time;
+static volatile int pick_struck;
 static void phrase_tick(void) {
   if(!phrase_size)return;
   if(phrase_wait){phrase_wait--;return;}
@@ -517,6 +519,11 @@ static void phrase_tick(void) {
     int root=phrase_keys[0];
     int n=phrase_size==1 ? ((phrase_step&1)?scale_note(bound(root+(knob[SOUND][2]==0?knob[PICK_ART][3]:7),0,127)):root)
                          : phrase_keys[phrase_size-2+(phrase_step&1)];
+    int left=phrase_size==1?root:phrase_keys[phrase_size-2];
+    int right=phrase_size==1?scale_note(bound(root+knob[PICK_ART][3],0,127)):phrase_keys[phrase_size-1];
+    pick_display=left | (right<<8) | ((phrase_step&1)<<16);
+    pick_time=fm1_ms;
+    pick_struck=!(knob[PICK_ART][2] && (phrase_step&1) && strings[0].gate);
     int accented=phrase_step==0 || phrase_step==3 || phrase_step==6;
     int v=phrase_velocity[phrase_size==1?root:n]*(accented?100:100-knob[ARP][3]*3/5)/100;
     int tied=knob[SOUND][2]==0 && knob[PICK_ART][2];
@@ -536,6 +543,12 @@ static void phrase_tick(void) {
 }
 
 static void apply_events(void);
+static volatile int16_t scope_ring[1024] POOLMEM;
+static volatile unsigned scope_head;
+static volatile int meter_level[2];
+static volatile unsigned meter_peak_time[2];
+static volatile unsigned meter_peak_valid;
+static int arp_art_access;
 static volatile unsigned audio_ready;
 static void app_audio(int32_t *out, uint32_t n) {
   if (!audio_ready) return; /* Platform supplies a cleared buffer during startup. */
@@ -558,11 +571,15 @@ static void app_audio(int32_t *out, uint32_t n) {
   int predelay=knob[PLATE][3]*2205/100, wet=knob[PLATE][0];
   int hf_coefficient=256-2*knob[CHARACTER][0], saturation=knob[CHARACTER][1];
   int wow=knob[CHARACTER][2], flutter=knob[CHARACTER][3];
+  unsigned scope_write=scope_head;
+  int monitor_voice=page==SOUND, monitor_mix=page==MIDI || page==BT || page==LIGHTS || page==CHARACTER;
+  unsigned sums[2]={0,0}, peaks[2]={0,0};
   for (unsigned i = 0; i < n; i++) {
     if(phrase_enabled)phrase_tick();
     int dry = 0;
     for (int j = 0; j < 4; j++)
       dry += string_tick(&strings[j]);
+    if(monitor_voice)scope_ring[scope_write++ & 1023]=bound(dry,-32767,32767);
     int shape = voice_kind(), drive = knob[SOUND][1];
     int amp = shape >= SINGING ? dry : saturate(dry * (shape == 0 ? 1 + drive / 35 : 4 + drive / 9)) * 2;
     amp_lp += (amp - amp_lp) * (shape >= SINGING ? 2 : shape == 3 ? 5 : 3) / 8;
@@ -632,6 +649,22 @@ static void app_audio(int32_t *out, uint32_t n) {
     plate_half^=1;
     out[2*i]=bound(mix+l*wet/65,-31500,31500);
     out[2*i+1]=bound(mix+r*wet/65,-31500,31500);
+    if(monitor_mix)for(int ch=0;ch<2;ch++){
+      unsigned v=absolute(out[2*i+ch]);
+#if defined(GRANA_WEB)
+      v=v*(unsigned)web_master>>15;
+#elif !defined(DINGHY_HOST)
+      v=v*(unsigned)master_q12>>12;
+#endif
+      sums[ch]+=v;
+      if(v>peaks[ch])peaks[ch]=v;
+    }
+  }
+  scope_head=scope_write;
+  if(monitor_mix && n)for(int ch=0;ch<2;ch++){
+    int mean=sums[ch]/n;
+    meter_level[ch]+=(mean-meter_level[ch])*(int)n/(int)(4410+n);
+    if(peaks[ch]>=29204){meter_peak_time[ch]=fm1_ms;meter_peak_valid|=1u<<ch;}
   }
   vu_in = peak_in > vu_in ? peak_in : vu_in * 9 / 10;
   vu_out = peak_out > vu_out ? peak_out : vu_out * 9 / 10;
@@ -809,7 +842,7 @@ static void boot_draw(unsigned ms) {
   cv_blit(0,52);
   cv_begin(240,52,0);
   for(unsigned i=0;i<240*22;i++)cv_px[i]=letters[intro_art[240*136+i]];
-  lettering(113,28,engines[knob[SOUND][2]],silver,0);
+
   cv_blit(0,188);
 }
 
@@ -846,12 +879,73 @@ static void eno_diagram(int gap, unsigned clock) {
   }
 }
 
+static void voice_scope(void) {
+  uint16_t grid=RGB(33,53,54), trace=RGB(108,232,199);
+  lettering(120,4,"VOICE / SCOPE",silver,0);
+  for(int x=10;x<=230;x+=22)cv_line(x,29,x,128,grid);
+  for(int y=29;y<=129;y+=25)cv_line(10,y,230,y,grid);
+  unsigned end=scope_head, at=end-221;
+  for(int lag=222;lag<800;lag++){
+    unsigned pos=end-lag;
+    if(scope_ring[(pos-1)&1023]<=0 && scope_ring[pos&1023]>0){at=pos;break;}
+  }
+  int prev=79;
+  for(int x=0;x<=220;x++){
+    int y=79-bound(scope_ring[(at+x)&1023]/350,-49,49);
+    if(x)cv_line(9+x,prev,10+x,y,trace);
+    prev=y;
+  }
+}
+static void stereo_vu(void) {
+  static const int marks[]={0,328,1036,3277,6538,13045,26028,32767};
+  for(int ch=0;ch<2;ch++){
+    int cx=60+ch*120, v=meter_level[ch], seg=0;
+    while(seg<6 && v>marks[seg+1])seg++;
+    int angle=bound(91-seg*8-(v-marks[seg])*8/(marks[seg+1]-marks[seg]),35,91);
+    for(int k=0;k<8;k++){
+      int a=91-8*k, dx=sine256[(a+64)&255],dy=sine256[a];
+      cv_line(cx+dx*64/127,112-dy*64/127,cx+dx*70/127,112-dy*70/127,k>=6?RGB(220,92,77):metal);
+    }
+    int dx=sine256[(angle+64)&255],dy=sine256[angle];
+    cv_line(cx,112,cx+dx*64/127,112-dy*64/127,gold);disc(cx,112,3,silver);
+    lettering(cx,7,ch?"R":"L",silver,0);
+    int hot=(meter_peak_valid&(1u<<ch)) && fm1_ms-meter_peak_time[ch]<650;
+    lettering(cx,22,"PEAK",hot?RGB(255,87,62):RGB(77,60,53),0);
+  }
+}
+static void note_label(int x,int note,uint16_t color) {
+  char label[8];const char *p=tonic_names[note%12];int j=0;
+  while(*p)label[j++]=*p++;
+  int oct=note/12-1;if(oct<0){label[j++]='-';oct=-oct;}
+  number(label+j,oct);lettering(x,48,label,color,0);
+}
+static void picking_view(void) {
+  static const char *const iv[]={"P1","m2","M2","m3","M3","P4","TT","P5","m6","M6","m7","M7","P8"};
+  unsigned state=pick_display;
+  int active=phrase_enabled && phrase_size && !phrase_wait;
+  int first=active?(state&127):phrase_size?phrase_keys[phrase_size>1?phrase_size-2:0]:60;
+  int second=active?(state>>8)&127:phrase_size>1?phrase_keys[phrase_size-1]:scale_note(bound(first+knob[PICK_ART][3],0,127));
+  int interval=absolute(second-first), side=(state>>16)&1;
+  char text[8];number(text,interval);
+  lettering(74,8,interval<=12?iv[interval]:"INTERVAL",silver,0);
+  lettering(144,8,text,gold,0);lettering(180,8,"st",silver,0);
+  if(knob[PICK_ART][2]){
+    int prev=47;
+    for(int x=62;x<=178;x+=2){int y=47-(x-62)*(178-x)/200;cv_line(x-2,prev,x,y,metal);prev=y;}
+  }
+  note_label(60,first,active && !side?gold:silver);note_label(180,second,active && side?gold:silver);
+  if(active)disc(side?180:60,79,4,pick_struck && fm1_ms-pick_time<70?RGB(255,246,182):gold);
+  lettering(120,107,phrase_wait && phrase_size?"WAIT":knob[PICK_ART][2]?"PICK + LEGATO":"PICK",silver,0);
+}
+
 static void draw(void) {
   if(intro && fm1_ms-intro_start<INTRO_END_MS){boot_draw(fm1_ms-intro_start);return;}intro=0;
   static const char *const modes[] = {"STOP", "REC", "DUB", "HOLD"};
   unsigned t = transport;
   cv_begin(240, 146, 0);
-  if(page==FUZZ || page==WAH || page==AMP || page==PLATE || page==ENV || page==COMP) effect_display();
+  if(page==SOUND)voice_scope();
+  else if((page==ARP || page==PICK_ART) && knob[SOUND][2]==0)picking_view();
+  else if(page==FUZZ || page==WAH || page==AMP || page==PLATE || page==ENV || page==COMP) effect_display();
   else if(page==OFF_TAPE) {
     lettering(120,12,"OFF-TAPE MONITOR",gold,0);
     cv_line(40,95,200,95,silver);
@@ -876,26 +970,19 @@ static void draw(void) {
       last=y;
     }
     lettering(32,122,"40 Hz",silver,0);lettering(203,122,"16 kHz",silver,0);
-  } else if(page==CHARACTER) {
-    lettering(120,28,"TAPE CHARACTER",gold,0);
-    lettering(120,72,"RECORD / PLAYBACK",silver,0);
-  } else if(page==LIGHTS) {
-    lettering(120,38,"KEY BACKLIGHT",gold,0);
-    lettering(120,82,"OFF     HALF     FULL",silver,0);
-  } else if(page==BT) {
+  } else if(page==CHARACTER || page==LIGHTS || page==BT || page==MIDI) {
+    stereo_vu();
+    const char *status=page==MIDI?(beat_ms && knob[MIDI][2]?"CLOCK LOCKED":"MIDI INPUT"):
+                       page==CHARACTER?"TAPE CHARACTER":page==LIGHTS?"KEY BACKLIGHT":"SYSTEM MIDI PORTS";
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
-    char name[22];const char *peer=radio_name(knob[BT][1]);unsigned j=0;
-    while(j<20 && peer[j]) {unsigned ch=(unsigned char)peer[j];name[j++]=(ch>=32 && ch<=126)?ch:'?';}name[j]=0;
-    lettering(120,27,bt_status,gold,0);lettering(120,65,name,silver,0);
-    lettering(120,104,"OCT+ TO CONFIRM",silver,0);
-#else
-    lettering(120,42,"SYSTEM MIDI PORTS",gold,0);
-    lettering(120,79,"USE MIDI INPUT BELOW",silver,0);
+    char peer[19];
+    if(page==BT){
+      const char *src=radio_name(knob[BT][1]);unsigned j=0;
+      while(j<18 && src[j]){unsigned c=(unsigned char)src[j];peer[j++]=c>=32 && c<=126?c:'?';}
+      peer[j]=0;status=knob[BT][1]?peer:bt_status;
+    }
 #endif
-  } else if(page==MIDI) {
-    lettering(120,26,"MIDI INPUT",gold,0);
-    lettering(120,64,knob[MIDI][2]?(beat_ms?"CLOCK LOCKED":"WAITING FOR CLOCK"):"INTERNAL TAPE TIME",silver,0);
-    lettering(120,103,"GLO  /  BLUETOOTH",silver,0);
+    lettering(120,123,status,silver,0);
   } else if(page==LFO) {
     lettering(120,7,"PITCH VIBRATO",gold,0);
     int prev=76;
@@ -1093,7 +1180,7 @@ static void update_leds(unsigned keys) {
     BTN_ENV, BTN_FX, BTN_LFO, BTN_GLO, BTN_GLO, BTN_ARP, BTN_FX, BTN_GLO, BTN_GLO, BTN_FX, BTN_FX, BTN_ARP, BTN_SEL
   };
   static unsigned previous_keys, previous_buttons;
-  unsigned buttons = 1u << page_button[page];
+  unsigned buttons = 1u << (page==PICK_ART && arp_art_access ? BTN_ARP : page_button[page]);
   unsigned t = transport;
   if (vib_on) buttons |= 1u << BTN_LFO;
   if (t==HOLD && reverse) buttons |= 1u << BTN_SEQ;
@@ -1118,6 +1205,7 @@ static void update_leds(unsigned keys) {
   previous_keys = keys;
 }
 static void app_setup(void) {
+  for(unsigned i=0;i<1024;i++)scope_ring[i]=0;
   unsigned char stored[5];
   if(!settings_load(stored,sizeof stored) && stored[0]<=2) {
     globals[0]=stored[0];
@@ -1210,10 +1298,13 @@ static void app_step(void) {
   if (edge & (1u << BTN_LFO)) { if(page==LFO) vib_on=!vib_on; page=LFO; }
   if (edge & (1u << BTN_EDIT))
     page = SOUND;
+  if(edge & (1u<<BTN_SEL))arp_art_access=0;
   if (edge & (1u << BTN_SEL)) page = page==ART ? SCALE : page==SCALE && knob[SOUND][2]==0 ? PICK_ART : ART;
   if (edge & (1u << BTN_GLO)) page = page==MIDI ? BT : page==BT ? LIGHTS : page==LIGHTS ? CHARACTER : MIDI;
   if(edge & (1u<<BTN_ARP)) {
-    if(knob[SOUND][2]==1) page=page==ARP ? HEAD2 : ARP;
+    if(knob[SOUND][2]==0 && page==ARP){page=PICK_ART;arp_art_access=1;}
+    else if(knob[SOUND][2]==0 && page==PICK_ART){page=ARP;arp_art_access=0;}
+    else if(knob[SOUND][2]==1) page=page==ARP ? HEAD2 : ARP;
     else { knob[ARP][0]=!knob[ARP][0]; page=ARP; }
   }
   if(edge & (1u<<BTN_SEQ)) {page=HOME;post(EV_REVERSE,0,0);}
@@ -1301,10 +1392,7 @@ static void app_main(void) {
   }
 }
 #endif
-static void app_sysex(const uint8_t *p, uint32_t n) {
-  (void)p;
-  (void)n;
-}
+#include "mt_backup.h"
 #ifdef GRANA_WEB
 static void web_presets_out(void) {}
 static void web_presets_in(void) {}

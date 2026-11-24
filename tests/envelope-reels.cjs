@@ -23,7 +23,7 @@ async function sound(engine,voice,adsr) {
  for(const eng of [0,1,2]){
  const {w,tick,render,page,press}=await boot();w.enc(1,eng);tick();
  const img=()=>{w.idle_preview();return Buffer.from(new Uint8Array(w.memory.buffer,w.fb(),240*146*2))};
- const stopped=img();press(10);assert.equal(w.page(),13);assert(stopped.equals(img()));
+ const stopped=img();press(10);assert.equal(w.page(),13);assert.equal(stopped.equals(img()),eng!==0);
  if(eng===1){press(10);assert.equal(w.page(),19);assert(stopped.equals(img()))}
  press(13);render(710);press(13);page(0);
  const start=img();render(30);const end=img();assert(!start.equals(end));page(8);
