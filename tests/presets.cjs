@@ -11,7 +11,7 @@ async function check() {
     let time=0;
     function tick(ms=6){time+=ms;w.step(time);w.audio()}
     function select(i){w.midi(192,i,0);tick();assert.equal(w.state()>>>16,i)}
-    function save(){w.button(9,1);tick();tick(1001);w.button(9,0);tick()}
+    function save(){w.button(9,1);tick();tick(1001);w.button(9,0);tick();w.button(9,1);tick();w.button(9,0);tick()}
     return {w,store,select,save,tick};
   }
   let e=await boot(), sounds=new Set();

@@ -699,13 +699,19 @@ static void draw(void) {
   }
   cv_rect(start[0]+41, 75, start[1]+64-(start[0]+41), 1, RGB(128,115,96));
   }
-  if (program_notice && fm1_ms-program_notice_time<1400u) {
-    char title[32]; int n=0;
-    const char *tone=tone_names[program%8], *space=space_names[program/8];
-    while(*tone) title[n++]=*tone++;
-    title[n++]=' ';
-    while(*space) title[n++]=*space++;
-    title[n]=0;
+  if(naming) {
+    cv_begin(240,146,ink);
+    char id[]={'P','0'+(destination+1)/10,'0'+(destination+1)%10,0};
+    lettering(120,7,id,gold,ink);
+    lettering(120,36,deleting?"DELETE THIS PRESET?":"EDIT PRESET NAME",silver,ink);
+    for(int i=0;i<NAME_LEN;i++){
+      char ch[2]={draft[i],0}; if(i==cursor)cv_rect(9+14*i,89,12,2,gold);
+      if(draft[i])lettering(15+14*i,64,ch,silver,ink);
+      else {if(i>=cursor)break;}
+    }
+    lettering(120,113,deleting?"SAVE: DELETE   HOME: EXIT":"SAVE: WRITE   HOME: EXIT",gold,ink);
+  } else if (program_notice && fm1_ms-program_notice_time<1400u) {
+    char title[NAME_LEN+1];slot_name(program,title);
     cv_rect(0,41,240,62,ink);
     lettering(120,46,program_notice,gold,ink); lettering(120,76,title,silver,ink);
   }
@@ -713,6 +719,12 @@ static void draw(void) {
   cv_begin(240, 94, ink);
   char slot_id[]={'P','0'+(program+1)/10,'0'+(program+1)%10,0};
   lettering(123,0,slot_id,silver,ink);
+  if(naming){
+    lettering(120,5,"SAVE",gold,ink);
+    const char *labels[]={"CURSOR","LETTER","DICE","DELETE"};
+    for(int k=0;k<4;k++) lettering(30+60*k,48,labels[k],silver,ink);
+    cv_blit(0,146);return;
+  }
   lettering(46,0,pages[page],gold,ink);
   lettering(204,0,(reverse && t == HOLD) ? "REV" : modes[t],silver,ink);
   int width = length ? position * 228u / length : 0;
@@ -849,7 +861,7 @@ static void update_leds(unsigned keys) {
   if (knob[ARP][0]) buttons |= 1u << BTN_ARP;
   if (octave < 0) buttons |= 1u << BTN_OCT_DOWN;
   if (octave > 0) buttons |= 1u << BTN_OCT_UP;
-  if (reverse && t == HOLD) buttons |= 1u << BTN_SAVE;
+  if (naming || (reverse && t == HOLD)) buttons |= 1u << BTN_SAVE;
   if (t != STOP) buttons |= 1u << BTN_PLAY;
   static unsigned blink_start;
   static int was_recording;
@@ -940,6 +952,7 @@ static void app_step(void) {
   static int rec_pending;
   unsigned rel = 0, edge = fm1_input_edges(&rel), keys = fm1_in.notes;
   if(edge || keys)intro=0;
+  if(edge & ~(1u<<BTN_SAVE)) naming=0;
   if (page==BT && (edge & (1u << BTN_OCT_UP))) {
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
     radio_action(knob[BT][1]);
@@ -959,9 +972,12 @@ static void app_step(void) {
   if (edge & (1u << BTN_SEQ)) { vib_on = !vib_on; page = LFO; }
   static unsigned save_started;
   static int save_pending;
-  if (edge & (1u << BTN_SAVE)) { save_started=fm1_ms; save_pending=1; }
+  if (edge & (1u << BTN_SAVE)) {
+    if(naming){ save_program();save_pending=0; }
+    else {save_started=fm1_ms;save_pending=1;}
+  }
   if (save_pending && fm1_ms-save_started>=1000u) {
-    save_program(); save_pending=0;
+    start_name(program); save_pending=0;
   }
   if (save_pending && (rel & (1u << BTN_SAVE))) {
     post(EV_REVERSE,0,0); save_pending=0;
@@ -985,19 +1001,21 @@ static void app_step(void) {
   if (edge & (1u << BTN_ENV)) page = ENV;
   int d = fm1_enc_take(ENC_SELECT);
   if(d)intro=0;
+  if (d) naming=0;
   if (d)
     page = ((page + d) % PAGE_COUNT + PAGE_COUNT) % PAGE_COUNT;
   d = fm1_enc_take(ENC_ALGORITHM);
   if(d)intro=0;
-  if (d) knob[SOUND][2] = bound(knob[SOUND][2] + d, 0, 7);
+  if (d && !naming) knob[SOUND][2] = bound(knob[SOUND][2] + d, 0, 7);
   d = fm1_enc_take(ENC_PRESETS);
   if(d)intro=0;
   if (d)
-    recall_program(bound(program+d,0,PROGRAM_COUNT-1));
+    { if(naming)start_name(bound(destination+d,0,PROGRAM_COUNT-1));
+      else recall_program(bound(program+d,0,PROGRAM_COUNT-1)); }
   for (int k = 0; k < 4; k++) {
     d = fm1_enc_take(ENC_KNOB1 + k);
-    if (d)
-      set_control(k,knob[page][k]+d);
+    if(d && naming) edit_name(k,d);
+    else if(d) set_control(k,knob[page][k]+d);
   }
   for (int k = 0; k < 27; k++)
     if ((keys ^ key_prev) & (1u << k)) {
@@ -1052,7 +1070,7 @@ static uint8_t *web_bank_buf(void) { return (uint8_t *)0; }
 static uint32_t web_bank_size(void) { return 0; }
 static void web_bank_changed(void) {}
 static uint32_t web_state(void) {
-  return (program << 16) | page | (transport << 4) | (knob[ARP][0] << 8) | (vib_on << 9) | (reverse << 10);
+  return ((naming?destination:program) << 16) | (naming << 11) | page | (transport << 4) | (knob[ARP][0] << 8) | (vib_on << 9) | (reverse << 10);
 }
 WEB_EXPORT("idle_preview") void web_idle_preview(void){intro=0;draw();}
 WEB_EXPORT("param") int web_param(unsigned k) {
