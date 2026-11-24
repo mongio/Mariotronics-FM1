@@ -80,6 +80,7 @@ static void capture_patch(Patch *p) {
   for (unsigned i=0;i<sizeof patch_pages;i++)
     for(int k=0;k<4;k++) p->values[i][k]=knob[patch_pages[i]][k];
   /* The high bit distinguishes tenths-of-a-second patches from legacy SWELL patches. */
+  p->values[12][1]=knob[HEAD2][0]; /* spare OFF_TAPE byte in existing patches */
   p->vibrato=128|vib_on;
 }
 static Patch working[2];
@@ -88,6 +89,7 @@ static int working_valid[2];
 static void apply_patch(const Patch *p) {
   for (unsigned i=0;i<sizeof patch_pages;i++)
     for(int k=0;k<4;k++) knob[patch_pages[i]][k]=p->values[i][k];
+  knob[HEAD2][0]=p->values[12][1]==1;
   vib_on=p->vibrato & 1;
   if (!(p->vibrato & 128)) {
     knob[HOME][0]=bound((knob[SOUND][2]+1)*10,40,80);
@@ -104,7 +106,14 @@ static void switch_engine(int next) {
   capture_patch(&working[current]);
   working_valid[current]=1;
   if (working_valid[next]) apply_patch(&working[next]);
+  if(!working_valid[next] && !next) knob[SOUND][0]=0;
+  if(!working_valid[next] && next) {
+    knob[ARP][0]=0;knob[ARP][1]=10;knob[ARP][2]=48;knob[ARP][3]=0;
+    knob[HEAD2][0]=0;knob[SOUND][0]=0;knob[ART][0]=0;
+    knob[FUZZ][3]=0;knob[AMP][0]=0;knob[WAH][3]=0;vib_on=0;
+  }
   knob[SOUND][2]=next;
+  if(page==HEAD2 && !next) page=ARP;
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   irq_restore(flags);
 #endif
@@ -129,6 +138,7 @@ static void recall_program(int slot) {
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   irq_restore(flags);
 #endif
+  if(page==HEAD2 && !knob[SOUND][2]) page=ARP;
   program=slot;
   program_notice=bank.custom[slot]==EMPTY_SLOT?"EMPTY SLOT":bank.custom[slot]?"USER PRESET":"FACTORY PRESET";
   program_notice_time=fm1_ms;
