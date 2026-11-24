@@ -16,7 +16,7 @@ class Mariotronics extends AudioWorkletProcessor {
     }
     const e = this.e;
     if (!e) return;
-    if(d.type==='param' && d.page===(e.state()&15))e.set_param(d.k,d.v);
+    if(d.type==='param' && d.page===e.page())e.set_param(d.k,d.v);
     else if (d.type === 'keys') e.keys(d.mask >>> 0);
     else if (d.type === 'button') e.button(d.id, d.down ? 1 : 0);
     else if (d.type === 'enc') e.enc(d.id, d.d);
@@ -33,7 +33,7 @@ class Mariotronics extends AudioWorkletProcessor {
     }
     if (currentTime - this.last > 0.033) {
       this.last = currentTime;
-      const g = e.fb_gen(), msg = { type: 'frame', leds: new Uint8Array(e.memory.buffer, e.leds(), 64).slice(), state: e.state() >>> 0, params: [0,1,2,3].map(k=>e.param(k)) };
+      const g = e.fb_gen(), msg = { type: 'frame', leds: new Uint8Array(e.memory.buffer, e.leds(), 64).slice(), state: e.state() >>> 0, page: e.page(), params: [0,1,2,3].map(k=>e.param(k)) };
       if (g !== this.gen) { this.gen = g; msg.fb = new Uint16Array(e.memory.buffer, e.fb(), 240 * 240).slice(); }
       const st = new Uint8Array(e.memory.buffer, e.store(), e.store_len());
       if (st[3] !== this.saves) { this.saves = st[3]; msg.light = st[4]; msg.bank=st.slice(); }

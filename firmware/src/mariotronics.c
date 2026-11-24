@@ -27,18 +27,18 @@
 static int16_t tape[CAPACITY] POOLMEM;
 enum { STOP, RECORD, DUB, HOLD };
 enum { SINGING = 4, HOLLOW = 5 };
-enum { HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, MIDI, BT, ARP, OFF_TAPE, LIGHTS, PAGE_COUNT };
-static const char *const pages[] = {"TAPE", "GUITAR", "PHRASING", "FUZZ", "SCALES", "WAH", "AMP", "PLATE", "ENV","COMP","LFO","MIDI","BLE MIDI","ARP","OFF-TAPE","LIGHTS"};
+enum { HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, MIDI, BT, ARP, OFF_TAPE, LIGHTS, CHARACTER, PAGE_COUNT };
+static const char *const pages[] = {"TAPE", "GUITAR", "PHRASING", "FUZZ", "SCALES", "WAH", "AMP", "PLATE", "ENV","COMP","LFO","MIDI","BLE MIDI","ARP","OFF-TAPE","LIGHTS","TAPE CHAR"};
 static const char *const names[][4] = {{"SWELL", "FDBK", "SEND", "RETURN"},
                                        {"VOICE", "DRIVE", "TAPE", "MODE"},
-                                       {"GLISS", "MS", "CENT", "HZ"}, {"DRIVE","TONE","BIAS","MIX"}, {"MODE","ROOT"}, {"SWEEP","RES","TONE","MIX"}, {"GAIN","BASS","TREBLE","VOL"}, {"MIX","DECAY","DAMP","PRE ms"}, {"A ms","D ms","S %","R ms"},{"THRESH","RATIO","REL ms","GAIN"},{"HZ","CENT","WAIT ms","RISE ms"},{"RX CH","CC IN","SYNC","BEATS"},{"RADIO","DEVICE"},{"PLAY","HZ","GATE %","ACCENT"},{"LEVEL %"},{"KEYS"}};
+                                       {"GLISS", "MS", "CENT", "HZ"}, {"DRIVE","TONE","BIAS","MIX"}, {"MODE","ROOT"}, {"SWEEP","RES","TONE","MIX"}, {"GAIN","BASS","TREBLE","VOL"}, {"MIX","DECAY","DAMP","PRE ms"}, {"A ms","D ms","S %","R ms"},{"THRESH","RATIO","REL ms","GAIN"},{"HZ","CENT","WAIT ms","RISE ms"},{"RX CH","CC IN","SYNC","BEATS"},{"RADIO","DEVICE"},{"PLAY","HZ","GATE %","ACCENT"},{"LEVEL %"},{"KEYS"},{"HF LOSS","SAT","WOW","FLUTTER"}};
 static volatile int knob[][4] = {
-    {38, 81, 80, 72}, {0, 55, 3, 0}, {1, 24, 22, 5}, {54,45,18,42}, {0,6}, {40,52,60,0}, {32,48,42,85}, {19,72,52,18}, {38,32,84,36},{46,2,40,12},{5,22,12,20},{0,1,0,8},{0,0},{0,9,72,38},{25},{2}};
+    {38, 81, 80, 72}, {0, 55, 3, 0}, {1, 24, 22, 5}, {54,45,18,42}, {0,6}, {40,52,60,0}, {32,48,42,85}, {19,72,52,18}, {38,32,84,36},{46,2,40,12},{5,22,12,20},{0,1,0,8},{0,0},{0,9,72,38},{25},{2},{32,0,0,0}};
 static const int maximum[][4] = {{100, 100, 100, 100},
                                  {1, 100, 7, 1},
                                  
-                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8},{1,16,95,100},{100},{2}};
-static const int minimum[][4] = {{0}, {0}, {0, 1, 0, 2}, {0}, {0},{0},{0},{0},{0},{0,1,0,0},{2,0,0,0},{0,0,0,1},{0},{0,3,20,0},{0},{0}};
+                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8},{1,16,95,100},{100},{2},{100,100,100,100}};
+static const int minimum[][4] = {{0}, {0}, {0, 1, 0, 2}, {0}, {0},{0},{0},{0},{0},{0,1,0,0},{2,0,0,0},{0,0,0,1},{0},{0,3,20,0},{0},{0},{0}};
 static const char *const voices[] = {"SING", "HOLLOW"};
 static const char *const mode_names[] = {"CHROM", "DORIAN", "MAJOR"};
 static const char *const tonic_names[] = {"C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"};
@@ -252,7 +252,42 @@ static int16_t head_history[HEAD_SAMPLES] POOLMEM;
 static unsigned head_index, head_count;
 static int head_previous, head_filtered;
 
+/* Short fractional delay on playback models speed variations without moving
+ * the record cursor. Its history is valid even when modulation is bypassed. */
+static int16_t play_history[128];
+static unsigned play_head, play_valid, wow_phase, flutter_phase;
+static int wow_depth, flutter_depth;
+
+static int read_transport(int sample, int wow, int flutter) {
+  play_history[play_head]=sample;
+  if (play_valid<128) play_valid++;
+  wow_phase+=201600u;       /* 0.69 Hz at tape rate */
+  flutter_phase+=2377600u;  /* 8.14 Hz at tape rate */
+  /* Slew depth when turning an encoder, including transitions to bypass. */
+  wow_depth+=bound(wow*64-wow_depth,-4,4);
+  flutter_depth+=bound(flutter*64-flutter_depth,-4,4);
+  if(wow_depth || flutter_depth) {
+    int delay_q8=((128+sinus(wow_phase))*wow_depth*3)/256
+                +((128+sinus(flutter_phase))*flutter_depth)/768;
+    unsigned whole=(unsigned)delay_q8>>8;
+    int a=whole<play_valid?play_history[(play_head-whole)&127u]:0;
+    int b=whole+1<play_valid?play_history[(play_head-whole-1)&127u]:0;
+    sample=a+(b-a)*(delay_q8&255)/256;
+  }
+  play_head=(play_head+1)&127u;
+  return sample;
+}
+static int tape_record_level(int sample,int saturation) {
+  int knee=30000-saturation*250;
+  int magnitude=absolute(sample);
+  if(magnitude<=knee) return sample;
+  int room=30000-knee;
+  int excess=magnitude-knee;
+  int shaped=knee+room*excess/(room+excess);
+  return sample<0?-shaped:shaped;
+}
 static void reset_head(void) {
+  play_valid=0;
   head_index = head_count = 0;
   head_previous = head_filtered = 0;
 }
@@ -412,6 +447,8 @@ static void app_audio(int32_t *out, uint32_t n) {
   int decay=100+knob[PLATE][1]*148/100;
   int damping=235-knob[PLATE][2]*215/100;
   int predelay=knob[PLATE][3]*2205/100, wet=knob[PLATE][0];
+  int hf_coefficient=256-2*knob[CHARACTER][0], saturation=knob[CHARACTER][1];
+  int wow=knob[CHARACTER][2], flutter=knob[CHARACTER][3];
   for (unsigned i = 0; i < n; i++) {
     if(phrase_enabled)phrase_tick();
     int dry = 0;
@@ -428,12 +465,13 @@ static void app_audio(int32_t *out, uint32_t n) {
       if (++dec_n == 3) {
         dec_n = 0;
         int old = position >= valid_samples ? 0 : tape[position];
+        old=read_transport(old,wow,flutter);
         prev_return = next_return;
         next_return = old;
         if (transport != HOLD) {
-          tape_lp += (old - tape_lp) * 3 / 4;
+          tape_lp += (old - tape_lp) * hf_coefficient / 256;
           int write = dec_sum / 3 + tape_lp * knob[HOME][1] / 100;
-          tape[position] = (int16_t)bound(write, -30000, 30000);
+          tape[position] = (int16_t)tape_record_level(write,saturation);
           advance_head(tape[position]);
           if (position == valid_samples)
             valid_samples++;
@@ -650,6 +688,9 @@ static void draw(void) {
       if(phrase_enabled && phrase_size>=2 && ((phrase_step+7)&7)==i)disc(x,105,3,gold);
     }
     lettering(120,120,"3 + 3 + 2",silver,0);
+  } else if(page==CHARACTER) {
+    lettering(120,28,"TAPE CHARACTER",gold,0);
+    lettering(120,72,"RECORD / PLAYBACK",silver,0);
   } else if(page==LIGHTS) {
     lettering(120,38,"KEY BACKLIGHT",gold,0);
     lettering(120,82,"OFF     HALF     FULL",silver,0);
@@ -845,14 +886,15 @@ static void set_key_backlight(int level) {
   fm1_led_bg_ns = ns[level];
   for (unsigned k = 0; k < 27; k++) fm1_led_back(KEY_LED(k), level != 0);
 }
-static unsigned char saved_light;
+static unsigned char globals[5]={2,32,0,0,0};
+static int globals_changed;
 static unsigned light_changed;
 static uint16_t midi_lit[128];
 
 static void update_leds(unsigned keys) {
   static const unsigned char page_button[PAGE_COUNT] = {
     BTN_HOME, BTN_EDIT, BTN_SEL, BTN_FX, BTN_SEL, BTN_FX, BTN_FX, BTN_FX,
-    BTN_ENV, BTN_FX, BTN_LFO, BTN_GLO, BTN_GLO, BTN_ARP, BTN_FX, BTN_GLO
+    BTN_ENV, BTN_FX, BTN_LFO, BTN_GLO, BTN_GLO, BTN_ARP, BTN_FX, BTN_GLO, BTN_GLO
   };
   static unsigned previous_keys, previous_buttons;
   unsigned buttons = 1u << page_button[page];
@@ -879,11 +921,13 @@ static void update_leds(unsigned keys) {
   previous_keys = keys;
 }
 static void app_setup(void) {
-  saved_light = 2;
-  unsigned char stored;
-  if (!settings_load(&stored, sizeof stored) && stored <= 2) saved_light = stored;
-  knob[LIGHTS][0] = saved_light;
-  set_key_backlight(saved_light);
+  unsigned char stored[5];
+  if(!settings_load(stored,sizeof stored) && stored[0]<=2) {
+    globals[0]=stored[0];
+    for(int i=1;i<5;i++) if(stored[i]<=100)globals[i]=stored[i];
+  } else if(!settings_load(stored,1) && stored[0]<=2) globals[0]=stored[0];
+  knob[LIGHTS][0]=globals[0];set_key_backlight(globals[0]);
+  for(int i=0;i<4;i++)knob[CHARACTER][i]=globals[1+i];
   intro=1;intro_start=fm1_ms;plate_init();
   RING_PUBLISH();
   programs_init();
@@ -901,8 +945,12 @@ static void set_control(int k,int v) {
 #endif
   }
   if(page==LIGHTS && k==0 && knob[LIGHTS][0]!=bound(v,0,2)) {
-    light_changed=fm1_ms;
+    globals_changed=1; light_changed=fm1_ms;
+    globals[0]=bound(v,0,2);
     set_key_backlight(bound(v,0,2));
+  }
+  if(page==CHARACTER && knob[page][k]!=bound(v,0,100)) {
+    globals[1+k]=bound(v,0,100); globals_changed=1; light_changed=fm1_ms;
   }
   knob[page][k]=bound(v,minimum[page][k],maximum[page][k]);
   if(k==0 && (page==ENV || page==HOME))
@@ -967,7 +1015,7 @@ static void app_step(void) {
   if (edge & (1u << BTN_EDIT))
     page = SOUND;
   if (edge & (1u << BTN_SEL)) page = page==ART ? SCALE : ART;
-  if (edge & (1u << BTN_GLO)) page = page==MIDI ? BT : page==BT ? LIGHTS : MIDI;
+  if (edge & (1u << BTN_GLO)) page = page==MIDI ? BT : page==BT ? LIGHTS : page==LIGHTS ? CHARACTER : MIDI;
   if (edge & (1u << BTN_ARP)) { knob[ARP][0] = !knob[ARP][0]; page = ARP; }
   if (edge & (1u << BTN_SEQ)) { vib_on = !vib_on; page = LFO; }
   static unsigned save_started;
@@ -1039,10 +1087,9 @@ static void app_step(void) {
 #endif
   if(!knob[MIDI][2] || (last_tick && fm1_ms-last_tick>1000)){last_tick=ticks=beat_ms=0;}
   update_leds(keys);
-  unsigned char level = knob[LIGHTS][0];
-  if (level != saved_light && fm1_ms-light_changed >= 600u) {
-    if (!settings_save(&level, sizeof level)) saved_light = level;
-    light_changed = fm1_ms;
+  if(globals_changed && fm1_ms-light_changed>=600u) {
+    if(!settings_save(globals,sizeof globals)) globals_changed=0;
+    light_changed=fm1_ms;
   }
   if (fm1_ms - last_frame >= (intro ? 33u : 80u)) {
     last_frame = fm1_ms;
@@ -1070,8 +1117,9 @@ static uint8_t *web_bank_buf(void) { return (uint8_t *)0; }
 static uint32_t web_bank_size(void) { return 0; }
 static void web_bank_changed(void) {}
 static uint32_t web_state(void) {
-  return ((naming?destination:program) << 16) | (naming << 11) | page | (transport << 4) | (knob[ARP][0] << 8) | (vib_on << 9) | (reverse << 10);
+  return ((naming?destination:program) << 16) | (naming << 11) | (page & 15) | (transport << 4) | (knob[ARP][0] << 8) | (vib_on << 9) | (reverse << 10);
 }
+WEB_EXPORT("page") int web_page(void){return page;}
 WEB_EXPORT("idle_preview") void web_idle_preview(void){intro=0;draw();}
 WEB_EXPORT("param") int web_param(unsigned k) {
   return k < 4 ? knob[page][k] : 0;
