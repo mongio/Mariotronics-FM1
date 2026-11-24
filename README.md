@@ -2,23 +2,23 @@
 
 Mariotronics turns the FM-1 into a playable guitar and tape-delay instrument inspired by Frippertronics. On power-up, the MTXT logo sits inside the left reel while a yellow cursor makes two passes around the feedback loop. The lowercase italic *mariotronics* title fades in beneath it. Two animated Revox A77s show the tape moving between the record and playback heads.
 
-**1.0 pre-release · Tested in emulation.** Installation, audio performance and BLE pairing on a physical FM-1 await verification.
+**1.1 pre-release · Tested in emulation.** Installation, audio performance and BLE pairing on a physical FM-1 await verification.
 
 ## Try it
 
-[Download the standalone editor and emulator (ZIP)](https://raw.githubusercontent.com/mongio/Mariotronics-FM1/main/downloads/Mariotronics_Editor_FM1.zip). Extract the ZIP, open **Mariotronics_1_0.html** in desktop Chrome or Edge and click **Power on**. The emulator works offline. Hold REC for 1.2 seconds to erase the tape. Powering off clears the tape in RAM.
+[Download the standalone editor and emulator (ZIP)](https://raw.githubusercontent.com/mongio/Mariotronics-FM1/main/downloads/Mariotronics_Editor_FM1.zip). Extract the ZIP, open **Mariotronics_1_1.html** in desktop Chrome or Edge and click **Power on**. The emulator works offline. Hold REC for 1.2 seconds to erase the tape. Powering off clears the tape in RAM.
 
 ## Install on FM-1
 
-Connect one powered FM-1 with a USB data cable. Open the downloaded editor, select **Install Mariotronics**, and grant MIDI SysEx access. Installation replaces the existing firmware. Leave power and USB connected until the editor reports **Installed · FM-1_850**.
+Connect one powered FM-1 with a USB data cable. Open the downloaded editor, select **Install Mariotronics**, and grant MIDI SysEx access. Installation replaces the existing firmware. Leave power and USB connected until the editor reports **Installed · FM-1_851**.
 
-[Download the firmware package](https://github.com/mongio/Mariotronics-FM1/raw/refs/heads/main/downloads/mariotronics-1.0.fwsc).
+[Download the firmware package](https://github.com/mongio/Mariotronics-FM1/raw/refs/heads/main/downloads/mariotronics-1.1.fwsc).
 
 ## Play
 
 - **EDIT** opens Instrument and selects the voice for the current algorithm.
 - **LFO** sets vibrato rate, depth, delay and rise. **ARP** alternates two held notes with a 3+3+2 accent.
-- **REC** records and overdubs. **SEQ** plays a recorded loop in reverse. **REC** holds or resumes overdubbing on a recorded loop. HOME K1 sets Tape Delay. ALGORITHM selects FRIPP or ENO.
+- **REC** records and overdubs. **SEQ** toggles reverse on a recorded loop. **REC** holds or resumes overdubbing on a recorded loop. HOME K1 sets Tape Delay. ALGORITHM selects FRIPP or ENO.
 - **FX** opens compression, fuzz, wah, amplifier and stereo plate. The plate follows the tape return, so its tail stays out of the recording.
 - **GLO** opens MIDI and Bluetooth MIDI. The editor includes the CC assignments and transport instructions.
 
@@ -28,7 +28,7 @@ Connect one powered FM-1 with a USB data cable. Open the downloaded editor, sele
 
 **Panel lights.** GLO cycles through MIDI, BLE MIDI, LIGHTS and TAPE CHARACTER. On LIGHTS, K1 selects OFF, HALF or FULL idle key backlight (default FULL). A held key lights at peak brightness. REC flashes while recording or overdubbing. PLAY stays lit while the tape moves.
 
-**Presets.** Turn PRESETS to recall P01–P64. Each group of eight combines Singing, Hollow, Velvet, Glass, Fuzz, Reed, Copper and Wire with a different tape and articulation setup: Tape, Swell, Dusk, Echo, Bloom, Pulse, Mist or Drift. Press SAVE to open SAVE. K1 moves the cursor, K2 edits the character, K3 generates a tape-inspired name, and K4 left erases a character. K4 right selects Delete Preset. Turn PRESETS to choose the destination. Press SAVE to commit or HOME to cancel. Tap SEQ to play the tape in reverse. Tap REC during overdub for HOLD. MIDI Program Change 0–63 recalls the same slots. Presets store instrument voice, articulation, scale, effects, tape controls and arpeggiator settings. Recorded audio and global controls are separate. The FM-1 stores edits in flash and the editor stores its own bank in the browser. Startup recalls P01.
+**Presets.** Turn PRESETS to recall P01–P64. Each group of eight combines Singing, Hollow, Velvet, Glass, Fuzz, Reed, Copper and Wire with a different tape and articulation setup: Tape, Swell, Dusk, Echo, Bloom, Pulse, Mist or Drift. Press SAVE to open SAVE. K1 moves the cursor, K2 edits the character, K3 generates a tape-inspired name, and K4 left erases a character. K4 right selects Delete Preset. Turn PRESETS to choose the destination. Press SAVE to commit or HOME to cancel. Tap SEQ to toggle forward/reverse playback and show the decks. Tap REC during overdub for HOLD. MIDI Program Change 0–63 recalls the same slots. Presets store instrument voice, articulation, scale, effects, tape controls and arpeggiator settings. Recorded audio and global controls are separate. The FM-1 stores edits in flash and the editor stores its own bank in the browser. Startup recalls P01.
 
 **Tape Character.** From HOME, press GLO four times. K1 HF LOSS darkens each feedback pass, K2 SAT softens record peaks, K3 WOW and K4 FLUTTER modulate long-head playback (including HOLD and reverse). Global settings are saved after adjustment. The defaults 32/0/0/0 reproduce the previous tape response.
 

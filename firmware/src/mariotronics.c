@@ -120,8 +120,7 @@ static void strike(int slot, int note, int velocity, int kind) {
     s->sample_pos=s->sample_reverse ? (PIANO_FRAMES-2)<<16 : 0;
     s->sample_step=piano_step[note];
     s->strength=velocity;
-    s->damper=32768;
-    s->hammer_filter=0; s->sample_wave=s->bell_phase=0; s->piano_tone=128; s->release_step=48; s->tremolo=0;
+    s->hammer_filter=0; s->sample_wave=s->bell_phase=0; s->piano_tone=128; s->damper=48; s->tremolo=0;
     return;
   }
   for (i = 0; i <= n; i++) {
@@ -235,7 +234,7 @@ static int piano_tick(String *s) {
     s->sample_step=(piano_step[s->note]/32)*(period256[s->note]+64u)/read_delay*32;
     if(knob[SOUND][2]) {
       s->piano_tone=bound(16+knob[ARP][1]*7+s->strength/2+(s->kind==BRIGHT?45:0),16,245);
-      s->release_step=12+knob[ARP][2];
+      s->damper=knob[ARP][2];
       s->tremolo=knob[ARP][3];
     }
   }
@@ -264,20 +263,37 @@ static int piano_tick(String *s) {
       sample=choir*bound(elapsed,0,2600)/2600*bound(PIANO_FRAMES-1-elapsed,0,7500)/7500;
     }
   }
-  s->hammer_filter+=(sample-s->hammer_filter)*s->piano_tone/256;
+  /* The felt damper darkens released notes; ENV sets their amplitude. */
+  int tone=s->gate?s->piano_tone:s->piano_tone*(112-s->damper)/112;
+  s->hammer_filter+=(sample-s->hammer_filter)*tone/256;
   s->phase+=486957u; /* 5 Hz tremolo */
   int amp=256-(127+sinus(s->phase))*s->tremolo/200;
-  if(!s->gate) s->damper=bound(s->damper-s->release_step,0,32768);
-  if(!s->damper || (s->sample_reverse ? s->sample_pos<s->sample_step :
-      s->sample_step>=((PIANO_FRAMES-1)<<16)-s->sample_pos)) s->active=0;
+  if(s->sample_reverse ? s->sample_pos<s->sample_step :
+      s->sample_step>=((PIANO_FRAMES-1)<<16)-s->sample_pos) s->active=0;
   else s->sample_pos+=s->sample_reverse ? -s->sample_step : s->sample_step;
-  return ((s->hammer_filter*s->strength/127)*amp/256)*s->damper/32768;
+  return (s->hammer_filter*s->strength/127)*amp/256;
 }
 
+static int envelope_tick(String *s) {
+  if (!s->gate) {
+    if (!s->release_step) s->release_step=1+s->env_q8/s->release_length;
+    s->env_q8-=s->release_step;
+    if(s->env_q8<=0) { s->active=0; return 0; }
+  } else if(!s->peaked) {
+    s->env_q8+=s->attack;
+    if(s->env_q8>=32767*256) { s->env_q8=32767*256; s->peaked=1; }
+  } else if(s->env_q8>s->sustain) {
+    s->env_q8=bound(s->env_q8-s->decay_step,s->sustain,32767*256);
+  }
+  s->level=s->env_q8>>8;
+  return s->level;
+}
 static int string_tick(String *s) {
   if (!s->active)
     return 0;
-  if(s->kind>=PIANO) return piano_tick(s);
+  int level=envelope_tick(s);
+  if(!s->active) return 0;
+  if(s->kind>=PIANO) return (piano_tick(s)*level)>>15;
   if ((s->pitch_clock++ & 15) == 0) update_pitch(s);
   int len = s->delay >> 8, fr = s->delay & 255, r = (s->at - len) & 2047;
   int a = s->line[r], v = a + ((s->line[(r - 1) & 2047] - a) * fr >> 8);
@@ -293,17 +309,6 @@ static int string_tick(String *s) {
   int pickup =
       s->line[(s->at - (len * (s->kind == 0 ? 9 : 22) / 100 + 1)) & 2047];
   s->at = (s->at + 1) & 2047;
-  if (!s->gate) {
-    if (!s->release_step) s->release_step=1+s->env_q8/s->release_length;
-    s->env_q8-=s->release_step;
-    if(s->env_q8<=0) { s->active=0; return 0; }
-  } else if(!s->peaked) {
-    s->env_q8+=s->attack;
-    if(s->env_q8>=32767*256) { s->env_q8=32767*256; s->peaked=1; }
-  } else if(s->env_q8>s->sustain) {
-    s->env_q8=bound(s->env_q8-s->decay_step,s->sustain,32767*256);
-  }
-  s->level=s->env_q8>>8;
   int picked = y - pickup * 3 / 5;
   if (s->kind >= SINGING)
     picked = singing_pickup(s, picked, knob[SOUND][1]);
@@ -801,23 +806,6 @@ static void draw(void) {
       last=y;
     }
     lettering(32,122,"40 Hz",silver,0);lettering(203,122,"16 kHz",silver,0);
-  } else if(page==HEAD2) {
-    lettering(120,22,"SECOND TAPE HEAD",gold,0);
-    lettering(120,63,knob[HEAD2][0]?"ON":"OFF",silver,0);
-    lettering(120,103,"73.1% OF TAPE LENGTH",silver,0);
-  } else if(page==ARP && knob[SOUND][2]) {
-    lettering(120,15,"NOTE FX",gold,0);
-    lettering(120,53,knob[ARP][0]?"REVERSE NOTE":"FORWARD NOTE",silver,0);
-    lettering(120,105,"ARP  >  SECOND HEAD",silver,0);
-  } else if(page==ARP) {
-    lettering(120,16,"TWO-NOTE PICKING",gold,0);
-    for(int i=0;i<8;i++){
-      int x=22+i*28,y=(i&1)?62:84;
-      int accent=i==0||i==3||i==6;
-      cv_rect(x-6,y,12,accent?6:3,accent?gold:silver);
-      if(phrase_enabled && phrase_size && ((phrase_step+7)&7)==i)disc(x,105,3,gold);
-    }
-    lettering(120,120,"3 + 3 + 2",silver,0);
   } else if(page==CHARACTER) {
     lettering(120,28,"TAPE CHARACTER",gold,0);
     lettering(120,72,"RECORD / PLAYBACK",silver,0);
@@ -1000,7 +988,7 @@ static void apply_events(void) {
     case EV_REVERSE:
       if(transport==RECORD && valid_samples) rec_command();
       if (has_loop) {
-        reverse = 1;
+        reverse = !reverse;
         transport = HOLD;
       }
       break;
@@ -1153,7 +1141,7 @@ static void app_step(void) {
     if(knob[SOUND][2]) page=page==ARP ? HEAD2 : ARP;
     else { knob[ARP][0]=!knob[ARP][0]; page=ARP; }
   }
-  if(edge & (1u<<BTN_SEQ)) post(EV_REVERSE,0,0);
+  if(edge & (1u<<BTN_SEQ)) {page=HOME;post(EV_REVERSE,0,0);}
   if(edge & (1u<<BTN_SAVE)) {
     if(naming)save_program(); else start_name(program);
   }

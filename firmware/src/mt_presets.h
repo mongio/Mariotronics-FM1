@@ -121,6 +121,7 @@ static void switch_engine(int next) {
   if(!working_valid[next] && !next) knob[SOUND][0]=0;
   if(!working_valid[next] && next) {
     knob[ARP][0]=0;knob[ARP][1]=10;knob[ARP][2]=48;knob[ARP][3]=0;
+    knob[ENV][0]=0;knob[ENV][1]=44;knob[ENV][2]=85;knob[ENV][3]=35;
     knob[HEAD2][0]=0;knob[SOUND][0]=0;knob[ART][0]=0;
     knob[FUZZ][3]=0;knob[AMP][0]=0;knob[WAH][3]=0;vib_on=0;
   }
