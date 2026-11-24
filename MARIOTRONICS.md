@@ -11,7 +11,7 @@ EDIT opens Guitar. LFO adjusts rate, depth, wait and rise. SEQ switches vibrato.
 On Linux x86-64, use the JieLi toolchain and AC79 SDK for the firmware, and clang with wasm-ld for the emulator. Set JIELI_TOOLCHAIN and AC79_SDK before building.
 
 ```sh
-./build.sh --release 0.2
+./build.sh --release 0.3
 clang --target=wasm32 -O2 -ffreestanding -nostdlib -fno-builtin -DGRANA_WEB -Ifirmware/src -Ifirmware/gen -Wl,--no-entry -Wl,--export-memory -Wl,-z,stack-size=262144 -Wl,--initial-memory=16777216 -o web/mariotronics.wasm firmware/src/mariotronics.c
 python3 web/make_mariotronics.py
 ```

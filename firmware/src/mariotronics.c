@@ -396,7 +396,9 @@ static void phrase_tick(void) {
 }
 
 static void apply_events(void);
+static volatile unsigned audio_ready;
 static void app_audio(int32_t *out, uint32_t n) {
+  if (!audio_ready) return; /* Platform supplies a cleared buffer during startup. */
   apply_events();
   if (!loop_mode) {
     unsigned requested = beat_length();
@@ -810,6 +812,8 @@ static void apply_events(void) {
 }
 static void app_setup(void) {
   intro=1;intro_start=fm1_ms;plate_init();
+  RING_PUBLISH();
+  audio_ready=1;
 
   draw();
 }
@@ -927,9 +931,10 @@ static void app_step(void) {
         key_channels[k]=knob[MIDI][0]?knob[MIDI][0]-1:0;
         keyboard_out(144+key_channels[k],key_notes[k],110);
         post(EV_NOTE, key_notes[k], 110);
-      } else
+      } else {
         keyboard_out(128+key_channels[k],key_notes[k],0);
         post(EV_OFF, key_notes[k], 0);
+      }
     }
   key_prev = keys;
   uint8_t st, a, b;
