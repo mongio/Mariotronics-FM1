@@ -79,22 +79,50 @@ static void edit_name(int k,int d) {
 static void capture_patch(Patch *p) {
   for (unsigned i=0;i<sizeof patch_pages;i++)
     for(int k=0;k<4;k++) p->values[i][k]=knob[patch_pages[i]][k];
-  p->vibrato=vib_on;
+  /* The high bit distinguishes tenths-of-a-second patches from legacy SWELL patches. */
+  p->vibrato=128|vib_on;
 }
+static Patch working[2];
+static int working_valid[2];
+
+static void apply_patch(const Patch *p) {
+  for (unsigned i=0;i<sizeof patch_pages;i++)
+    for(int k=0;k<4;k++) knob[patch_pages[i]][k]=p->values[i][k];
+  vib_on=p->vibrato & 1;
+  if (!(p->vibrato & 128)) {
+    knob[HOME][0]=bound((knob[SOUND][2]+1)*10,40,80);
+    knob[SOUND][2]=0;
+  }
+}
+
+static void switch_engine(int next) {
+  int current=knob[SOUND][2];
+  if (current==next) return;
+#if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
+  unsigned flags=irq_save();
+#endif
+  capture_patch(&working[current]);
+  working_valid[current]=1;
+  if (working_valid[next]) apply_patch(&working[next]);
+  knob[SOUND][2]=next;
+#if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
+  irq_restore(flags);
+#endif
+}
+
 static void recall_program(int slot) {
   naming=0;
   Patch p = bank.custom[slot]==1 ? bank.patch[slot] : initial_patch;
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   unsigned flags=irq_save();
 #endif
-  for (unsigned i=0;i<sizeof patch_pages;i++)
-    for(int k=0;k<4;k++) knob[patch_pages[i]][k]=p.values[i][k];
-  vib_on=p.vibrato;
+  working_valid[0]=working_valid[1]=0;
+  apply_patch(&p);
   if (!bank.custom[slot]) {
     const unsigned char *t=tones[slot%8], *s=spaces[slot/8];
     knob[SOUND][0]=t[0]; knob[SOUND][1]=t[1]; knob[FUZZ][0]=t[2]; knob[FUZZ][3]=t[3];
     knob[AMP][0]=t[4]; knob[AMP][2]=t[5]; knob[WAH][3]=t[6];
-    knob[HOME][0]=knob[ENV][0]=s[0]; knob[HOME][1]=s[1]; knob[SOUND][2]=s[2]-1;
+    knob[ENV][0]=s[0]; knob[HOME][1]=s[1]; knob[HOME][0]=10*s[2];
     knob[PLATE][0]=s[3]; knob[PLATE][1]=s[4]; knob[OFF_TAPE][0]=s[5];
     knob[ART][1]=s[6]; knob[LFO][1]=knob[ART][2]=s[7];
   }
@@ -158,7 +186,8 @@ static void save_program(void) {
     program_notice="SAVE FAILED";
   } else {
     bank_sector=target; bank_generation=generation;
-    if(!deleting || slot==program) recall_program(slot);
+    if(!deleting) program=slot;
+    else if(slot==program) recall_program(slot);
     program_notice=deleting?"PRESET DELETED":"PRESET SAVED";
   }
   naming=0;program_notice_time=fm1_ms;
