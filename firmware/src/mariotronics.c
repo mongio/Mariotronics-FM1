@@ -27,18 +27,18 @@
 static int16_t tape[CAPACITY] POOLMEM;
 enum { STOP, RECORD, DUB, HOLD };
 enum { SINGING = 4, HOLLOW = 5 };
-enum { HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, MIDI, BT, ARP, OFF_TAPE, PAGE_COUNT };
-static const char *const pages[] = {"TAPE", "GUITAR", "PHRASING", "FUZZ", "SCALES", "WAH", "AMP", "PLATE", "ENV","COMP","LFO","MIDI","BLE MIDI","ARP","OFF-TAPE"};
+enum { HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, MIDI, BT, ARP, OFF_TAPE, LIGHTS, PAGE_COUNT };
+static const char *const pages[] = {"TAPE", "GUITAR", "PHRASING", "FUZZ", "SCALES", "WAH", "AMP", "PLATE", "ENV","COMP","LFO","MIDI","BLE MIDI","ARP","OFF-TAPE","LIGHTS"};
 static const char *const names[][4] = {{"SWELL", "FDBK", "SEND", "RETURN"},
                                        {"VOICE", "DRIVE", "TAPE", "MODE"},
-                                       {"GLISS", "MS", "CENT", "HZ"}, {"DRIVE","TONE","BIAS","MIX"}, {"MODE","ROOT"}, {"SWEEP","RES","TONE","MIX"}, {"GAIN","BASS","TREBLE","VOL"}, {"MIX","DECAY","DAMP","PRE ms"}, {"A ms","D ms","S %","R ms"},{"THRESH","RATIO","REL ms","GAIN"},{"HZ","CENT","WAIT ms","RISE ms"},{"RX CH","CC IN","SYNC","BEATS"},{"RADIO","DEVICE"},{"PLAY","HZ","GATE %","ACCENT"},{"LEVEL %"}};
+                                       {"GLISS", "MS", "CENT", "HZ"}, {"DRIVE","TONE","BIAS","MIX"}, {"MODE","ROOT"}, {"SWEEP","RES","TONE","MIX"}, {"GAIN","BASS","TREBLE","VOL"}, {"MIX","DECAY","DAMP","PRE ms"}, {"A ms","D ms","S %","R ms"},{"THRESH","RATIO","REL ms","GAIN"},{"HZ","CENT","WAIT ms","RISE ms"},{"RX CH","CC IN","SYNC","BEATS"},{"RADIO","DEVICE"},{"PLAY","HZ","GATE %","ACCENT"},{"LEVEL %"},{"KEYS"}};
 static volatile int knob[][4] = {
-    {38, 81, 80, 72}, {0, 55, 3, 0}, {1, 24, 22, 5}, {54,45,18,42}, {0,6}, {40,52,60,0}, {32,48,42,85}, {19,72,52,18}, {38,32,84,36},{46,2,40,12},{5,22,12,20},{0,1,0,8},{0,0},{0,9,72,38},{25}};
+    {38, 81, 80, 72}, {0, 55, 3, 0}, {1, 24, 22, 5}, {54,45,18,42}, {0,6}, {40,52,60,0}, {32,48,42,85}, {19,72,52,18}, {38,32,84,36},{46,2,40,12},{5,22,12,20},{0,1,0,8},{0,0},{0,9,72,38},{25},{2}};
 static const int maximum[][4] = {{100, 100, 100, 100},
                                  {1, 100, 7, 1},
                                  
-                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8},{1,16,95,100},{100}};
-static const int minimum[][4] = {{0}, {0}, {0, 1, 0, 2}, {0}, {0},{0},{0},{0},{0},{0,1,0,0},{2,0,0,0},{0,0,0,1},{0},{0,3,20,0},{0}};
+                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8},{1,16,95,100},{100},{2}};
+static const int minimum[][4] = {{0}, {0}, {0, 1, 0, 2}, {0}, {0},{0},{0},{0},{0},{0,1,0,0},{2,0,0,0},{0,0,0,1},{0},{0,3,20,0},{0},{0}};
 static const char *const voices[] = {"SING", "HOLLOW"};
 static const char *const mode_names[] = {"CHROM", "DORIAN", "MAJOR"};
 static const char *const tonic_names[] = {"C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"};
@@ -492,6 +492,7 @@ static void number(char *s, int n) {
 }
 static const char *value_text(int k, char *s) {
   int v = knob[page][k];
+  if(page==LIGHTS) { static const char *const levels[]={"OFF","HALF","FULL"}; return levels[v]; }
   if(page==ARP && k==0)return v?"ON":"OFF";
   if(page==MIDI && k==0 && !v) return "OMNI";
   if((page==MIDI && (k==1||k==2))||(page==BT && k==0)) return v?"ON":"OFF";
@@ -648,6 +649,9 @@ static void draw(void) {
       if(phrase_enabled && phrase_size>=2 && ((phrase_step+7)&7)==i)disc(x,105,3,gold);
     }
     lettering(120,120,"3 + 3 + 2",silver,0);
+  } else if(page==LIGHTS) {
+    lettering(120,38,"KEY BACKLIGHT",gold,0);
+    lettering(120,82,"OFF     HALF     FULL",silver,0);
   } else if(page==BT) {
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
     char name[22];const char *peer=radio_name(knob[BT][1]);unsigned j=0;
@@ -702,7 +706,7 @@ static void draw(void) {
   cv_rect(6, 19, 228, 2, metal);
   cv_rect(6, 19, width, 2, gold);
   for (int k = 0; k < 4; k++) {
-    if (page == OFF_TAPE && k > 0) break;
+    if ((page == OFF_TAPE || page == LIGHTS) && k > 0) break;
     if ((page == SCALE || page == BT) && k >= 2) break;
     int x = (page == SCALE || page == BT) ? 60 + 120 * k : 30 + 60 * k;
     int v = knob[page][k], lo = minimum[page][k], hi = maximum[page][k];
@@ -810,7 +814,51 @@ static void apply_events(void) {
     }
   }
 }
+/* VIRGO 0.6.3 idle pulses; pressed keys use the full scan-column time. */
+static void set_key_backlight(int level) {
+  static const uint16_t ns[] = {0, 1500, 5000};
+  fm1_led_bg_ns = ns[level];
+  for (unsigned k = 0; k < 27; k++) fm1_led_back(KEY_LED(k), level != 0);
+}
+static unsigned char saved_light;
+static unsigned light_changed;
+static uint16_t midi_lit[128];
+
+static void update_leds(unsigned keys) {
+  static const unsigned char page_button[PAGE_COUNT] = {
+    BTN_HOME, BTN_EDIT, BTN_SEL, BTN_FX, BTN_SEL, BTN_FX, BTN_FX, BTN_FX,
+    BTN_ENV, BTN_FX, BTN_LFO, BTN_GLO, BTN_GLO, BTN_ARP, BTN_FX, BTN_GLO
+  };
+  static unsigned previous_keys, previous_buttons;
+  unsigned buttons = 1u << page_button[page];
+  unsigned t = transport;
+  if (vib_on) buttons |= 1u << BTN_SEQ;
+  if (knob[ARP][0]) buttons |= 1u << BTN_ARP;
+  if (octave < 0) buttons |= 1u << BTN_OCT_DOWN;
+  if (octave > 0) buttons |= 1u << BTN_OCT_UP;
+  if (reverse && t == HOLD) buttons |= 1u << BTN_SAVE;
+  if (t != STOP) buttons |= 1u << BTN_PLAY;
+  static unsigned blink_start;
+  static int was_recording;
+  int recording = t == RECORD || t == DUB;
+  if (recording && !was_recording) blink_start = fm1_ms;
+  if (recording && (fm1_ms - blink_start) % 500u < 250u) buttons |= 1u << BTN_REC;
+  was_recording = recording;
+  for (unsigned id=0; id<14; id++)
+    if ((previous_buttons ^ buttons) & (1u << id)) fm1_led_key(id, buttons & (1u << id));
+  previous_buttons = buttons;
+  for (unsigned k=0; k<27; k++) {
+    if (midi_lit[53 + octave*12 + (int)k]) keys |= 1u << k;
+    if ((previous_keys ^ keys) & (1u << k)) fm1_led_key(KEY_LED(k), keys & (1u << k));
+  }
+  previous_keys = keys;
+}
 static void app_setup(void) {
+  saved_light = 2;
+  unsigned char stored;
+  if (!settings_load(&stored, sizeof stored) && stored <= 2) saved_light = stored;
+  knob[LIGHTS][0] = saved_light;
+  set_key_backlight(saved_light);
   intro=1;intro_start=fm1_ms;plate_init();
   RING_PUBLISH();
   audio_ready=1;
@@ -825,6 +873,10 @@ static void set_control(int k,int v) {
 #else
     v=0;
 #endif
+  }
+  if(page==LIGHTS && k==0 && knob[LIGHTS][0]!=bound(v,0,2)) {
+    light_changed=fm1_ms;
+    set_key_backlight(bound(v,0,2));
   }
   knob[page][k]=bound(v,minimum[page][k],maximum[page][k]);
   if(k==0 && (page==ENV || page==HOME))
@@ -849,12 +901,13 @@ static void midi_input(unsigned src,unsigned st,unsigned a,unsigned b) {
   }
   if(a>=128 || b>=128)return;
   unsigned char *tracked=&midi_notes[src][ch][a];
-  if(cmd==128 || (cmd==144 && !b)){if(*tracked){post(EV_OFF,*tracked-1,0);*tracked=0;}return;}
+  if(cmd==128 || (cmd==144 && !b)){if(*tracked){midi_lit[*tracked-1]--;post(EV_OFF,*tracked-1,0);*tracked=0;}return;}
   if(knob[MIDI][0] && knob[MIDI][0]!=(int)ch+1)return;
-  if(cmd==144){intro=0;if(*tracked)post(EV_OFF,*tracked-1,0);*tracked=1+scale_note(a);post(EV_NOTE,*tracked-1,b);}
+  if(cmd==144){intro=0;if(*tracked){midi_lit[*tracked-1]--;post(EV_OFF,*tracked-1,0);}
+    *tracked=1+scale_note(a);midi_lit[*tracked-1]++;post(EV_NOTE,*tracked-1,b);}
   if(cmd==192 && a<2)knob[SOUND][0]=a;
   if(cmd!=176)return;
-  if(a==120||a==123){for(int i=0;i<128;i++){unsigned char *n=&midi_notes[src][ch][i];if(*n){post(EV_OFF,*n-1,0);*n=0;}}return;}
+  if(a==120||a==123){for(int i=0;i<128;i++){unsigned char *n=&midi_notes[src][ch][i];if(*n){midi_lit[*n-1]--;post(EV_OFF,*n-1,0);*n=0;}}return;}
   if(!knob[MIDI][1])return;
   int v=(b*100+63)/127;
   switch(a){
@@ -887,7 +940,7 @@ static void app_step(void) {
   if (edge & (1u << BTN_EDIT))
     page = SOUND;
   if (edge & (1u << BTN_SEL)) page = page==ART ? SCALE : ART;
-  if (edge & (1u << BTN_GLO)) page = page==MIDI ? BT : MIDI;
+  if (edge & (1u << BTN_GLO)) page = page==MIDI ? BT : page==BT ? LIGHTS : MIDI;
   if (edge & (1u << BTN_ARP)) { knob[ARP][0] = !knob[ARP][0]; page = ARP; }
   if (edge & (1u << BTN_SEQ)) { vib_on = !vib_on; page = LFO; }
   if (edge & (1u << BTN_SAVE)) post(EV_REVERSE, 0, 0);
@@ -945,12 +998,16 @@ static void app_step(void) {
   if(bt_lost){bt_lost=0;for(int ch=0;ch<16;ch++)for(int n=0;n<128;n++)midi_input(1,128+ch,n,0);}
 #endif
   if(!knob[MIDI][2] || (last_tick && fm1_ms-last_tick>1000)){last_tick=ticks=beat_ms=0;}
+  update_leds(keys);
+  unsigned char level = knob[LIGHTS][0];
+  if (level != saved_light && fm1_ms-light_changed >= 600u) {
+    if (!settings_save(&level, sizeof level)) saved_light = level;
+    light_changed = fm1_ms;
+  }
   if (fm1_ms - last_frame >= (intro ? 33u : 80u)) {
     last_frame = fm1_ms;
     draw();
-    fm1_led_key(BTN_REC, transport == RECORD || transport == DUB);
-    fm1_led_key(BTN_ARP, knob[ARP][0]);
-    fm1_led_key(BTN_SEQ, vib_on);
+
   }
 }
 #ifndef GRANA_WEB

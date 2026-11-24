@@ -41,8 +41,8 @@ static uint32_t fm1_input_note_edges(void) { return 0; }
 static int32_t fm1_enc_take(uint32_t e) { int32_t d = web_enc_d[e % 7u]; web_enc_d[e % 7u] = 0; return d; }
 static uint8_t web_led_bg[64];
 static volatile uint16_t fm1_led_bg_ns;
-static void fm1_led_key(uint32_t id, int on) { if (id < 64u) web_led[id] = (uint8_t)(on ? 2 : web_led_bg[id]); }
-static void fm1_led_back(uint32_t id, int on) { if (id < 64u) { web_led_bg[id] = (uint8_t)(on ? 1 : 0); if (web_led[id] != 2u) web_led[id] = web_led_bg[id]; } }
+static void fm1_led_key(uint32_t id, int on) { if (id < 64u) web_led[id] = (uint8_t)(on ? 3 : web_led_bg[id]); }
+static void fm1_led_back(uint32_t id, int on) { if (id < 64u) { web_led_bg[id] = (uint8_t)(on ? (fm1_led_bg_ns == 1500 ? 1 : 2) : 0); if (web_led[id] != 3u) web_led[id] = web_led_bg[id]; } }
 
 /* the screen: 240 x 240 RGB565 */
 static uint16_t fb[240 * 240];

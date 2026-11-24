@@ -5,7 +5,7 @@ class Mariotronics extends AudioWorkletProcessor {
     if (d.type === 'wasm') {
       const { instance } = await WebAssembly.instantiate(d.bytes, {});
       const e = instance.exports;
-      if (d.store && d.store.length === e.store_len()) new Uint8Array(e.memory.buffer, e.store(), e.store_len()).set(d.store);
+      if ([0,1,2].includes(d.light)) new Uint8Array(e.memory.buffer,e.store(),5).set([1,1,0,0,d.light]);
       const u = new Uint8Array(e.memory.buffer, e.ubank_buf(), e.ubank_size()); u.fill(0xFF); if (d.ubank) u.set(d.ubank.subarray(0, u.length));
       e.init();
       this.saves = new Uint8Array(e.memory.buffer, e.store(), 4)[3];
@@ -35,7 +35,7 @@ class Mariotronics extends AudioWorkletProcessor {
       const g = e.fb_gen(), msg = { type: 'frame', leds: new Uint8Array(e.memory.buffer, e.leds(), 64).slice(), state: e.state() >>> 0, params: [0,1,2,3].map(k=>e.param(k)) };
       if (g !== this.gen) { this.gen = g; msg.fb = new Uint16Array(e.memory.buffer, e.fb(), 240 * 240).slice(); }
       const st = new Uint8Array(e.memory.buffer, e.store(), e.store_len());
-      if (st[3] !== this.saves) { this.saves = st[3]; msg.store = st.slice(); }
+      if (st[3] !== this.saves) { this.saves = st[3]; msg.light = st[4]; }
       this.port.postMessage(msg, msg.fb ? [msg.fb.buffer] : []);
     }
     return true;
