@@ -583,6 +583,7 @@ static void effect_display(void) {
   }
   lettering(120,124,page==PLATE?"PLATE":page==AMP?"AMP / CAB":page==WAH?"WAH":page==ENV?"A    D    S    R":page==COMP?"COMPRESSOR":"FUZZ",gold,0);
 }
+#include "mt_presets.h"
 static unsigned intro_start;
 static int intro;
 enum { INTRO_END_MS = 5600 };
@@ -698,8 +699,20 @@ static void draw(void) {
   }
   cv_rect(start[0]+41, 75, start[1]+64-(start[0]+41), 1, RGB(128,115,96));
   }
+  if (program_notice && fm1_ms-program_notice_time<1400u) {
+    char title[32]; int n=0;
+    const char *tone=tone_names[program%8], *space=space_names[program/8];
+    while(*tone) title[n++]=*tone++;
+    title[n++]=' ';
+    while(*space) title[n++]=*space++;
+    title[n]=0;
+    cv_rect(0,41,240,62,ink);
+    lettering(120,46,program_notice,gold,ink); lettering(120,76,title,silver,ink);
+  }
   cv_blit(0, 0);
   cv_begin(240, 94, ink);
+  char slot_id[]={'P','0'+(program+1)/10,'0'+(program+1)%10,0};
+  lettering(123,0,slot_id,silver,ink);
   lettering(46,0,pages[page],gold,ink);
   lettering(204,0,(reverse && t == HOLD) ? "REV" : modes[t],silver,ink);
   int width = length ? position * 228u / length : 0;
@@ -861,6 +874,7 @@ static void app_setup(void) {
   set_key_backlight(saved_light);
   intro=1;intro_start=fm1_ms;plate_init();
   RING_PUBLISH();
+  programs_init();
   audio_ready=1;
 
   draw();
@@ -905,7 +919,7 @@ static void midi_input(unsigned src,unsigned st,unsigned a,unsigned b) {
   if(knob[MIDI][0] && knob[MIDI][0]!=(int)ch+1)return;
   if(cmd==144){intro=0;if(*tracked){midi_lit[*tracked-1]--;post(EV_OFF,*tracked-1,0);}
     *tracked=1+scale_note(a);midi_lit[*tracked-1]++;post(EV_NOTE,*tracked-1,b);}
-  if(cmd==192 && a<2)knob[SOUND][0]=a;
+  if(cmd==192 && a<PROGRAM_COUNT){intro=0;recall_program(a);}
   if(cmd!=176)return;
   if(a==120||a==123){for(int i=0;i<128;i++){unsigned char *n=&midi_notes[src][ch][i];if(*n){midi_lit[*n-1]--;post(EV_OFF,*n-1,0);*n=0;}}return;}
   if(!knob[MIDI][1])return;
@@ -943,7 +957,15 @@ static void app_step(void) {
   if (edge & (1u << BTN_GLO)) page = page==MIDI ? BT : page==BT ? LIGHTS : MIDI;
   if (edge & (1u << BTN_ARP)) { knob[ARP][0] = !knob[ARP][0]; page = ARP; }
   if (edge & (1u << BTN_SEQ)) { vib_on = !vib_on; page = LFO; }
-  if (edge & (1u << BTN_SAVE)) post(EV_REVERSE, 0, 0);
+  static unsigned save_started;
+  static int save_pending;
+  if (edge & (1u << BTN_SAVE)) { save_started=fm1_ms; save_pending=1; }
+  if (save_pending && fm1_ms-save_started>=1000u) {
+    save_program(); save_pending=0;
+  }
+  if (save_pending && (rel & (1u << BTN_SAVE))) {
+    post(EV_REVERSE,0,0); save_pending=0;
+  }
   if (edge & (1u << BTN_REC)) {
     rec_started = fm1_ms;
     rec_pending = 1;
@@ -971,7 +993,7 @@ static void app_step(void) {
   d = fm1_enc_take(ENC_PRESETS);
   if(d)intro=0;
   if (d)
-    knob[SOUND][0] = ((knob[SOUND][0] + d) % 2 + 2) % 2;
+    recall_program(bound(program+d,0,PROGRAM_COUNT-1));
   for (int k = 0; k < 4; k++) {
     d = fm1_enc_take(ENC_KNOB1 + k);
     if (d)
@@ -1030,7 +1052,7 @@ static uint8_t *web_bank_buf(void) { return (uint8_t *)0; }
 static uint32_t web_bank_size(void) { return 0; }
 static void web_bank_changed(void) {}
 static uint32_t web_state(void) {
-  return page | (transport << 4) | (knob[ARP][0] << 8) | (vib_on << 9) | (reverse << 10);
+  return (program << 16) | page | (transport << 4) | (knob[ARP][0] << 8) | (vib_on << 9) | (reverse << 10);
 }
 WEB_EXPORT("idle_preview") void web_idle_preview(void){intro=0;draw();}
 WEB_EXPORT("param") int web_param(unsigned k) {
