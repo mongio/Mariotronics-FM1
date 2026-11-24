@@ -773,6 +773,7 @@ static void boot_draw(unsigned ms) {
   cv_blit(0,52);
   cv_begin(240,52,0);
   for(unsigned i=0;i<240*22;i++)cv_px[i]=letters[intro_art[240*136+i]];
+  lettering(113,28,engines[knob[SOUND][2]],silver,0);
   cv_blit(0,188);
 }
 
@@ -881,19 +882,20 @@ static void draw(void) {
   }
   cv_blit(0, 0);
   cv_begin(240, 94, ink);
+  lettering(113,0,engines[knob[SOUND][2]],gold,ink);
   char slot_id[]={'P','0'+(program+1)/10,'0'+(program+1)%10,0};
   if(naming){
-    lettering(120,3,"PRESETS selects destination",silver,ink);
+    lettering(120,20,"PRESETS selects destination",silver,ink);
     const char *labels[]={"CURSOR","LETTER","DICE","DELETE"};
     for(int k=0;k<4;k++) {
       char key[]={'K',(char)('1'+k),0};
-      lettering(30+60*k,35,key,gold,ink);
-      lettering(30+60*k,58,labels[k],silver,ink);
+      lettering(30+60*k,43,key,gold,ink);
+      lettering(30+60*k,64,labels[k],silver,ink);
     }
     cv_blit(0,146);return;
   }
-  lettering(123,0,slot_id,silver,ink);
-  lettering(46,0,page==HOME?engines[knob[SOUND][2]]:page==ARP && knob[SOUND][2]?"NOTE FX":pages[page],gold,ink);
+  lettering(155,0,slot_id,silver,ink);
+  lettering(46,0,page==ARP && knob[SOUND][2]?"NOTE FX":pages[page],gold,ink);
   if(t==HOLD) cv_rect(178,0,56,18,gold);
   lettering(204,0,(reverse && t==HOLD)?"REV":modes[t],t==HOLD?ink:silver,t==HOLD?gold:ink);
   int width = length ? position * 228u / length : 0;
