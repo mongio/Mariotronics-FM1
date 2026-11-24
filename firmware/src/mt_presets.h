@@ -76,6 +76,18 @@ static void edit_name(int k,int d) {
   }
   if(k==3 && d<0 && cursor<n) for(int i=cursor;i<n;i++)draft[i]=draft[i+1];
 }
+typedef struct { unsigned char eq[4],filter[4]; } TonePatch;
+static const TonePatch neutral_tone={{12,12,4,12},{0,77,0,100}};
+static TonePatch tone_bank[PROGRAM_COUNT],tone_working[2];
+static void capture_tone(TonePatch *t) {
+  for(int k=0;k<4;k++){t->eq[k]=knob[EQ][k];t->filter[k]=knob[FILTER][k];}
+}
+static void apply_tone(const TonePatch *t) {
+  for(int k=0;k<4;k++){
+    knob[EQ][k]=bound(t->eq[k],0,maximum[EQ][k]);
+    knob[FILTER][k]=bound(t->filter[k],0,maximum[FILTER][k]);
+  }
+}
 static void capture_patch(Patch *p) {
   for (unsigned i=0;i<sizeof patch_pages;i++)
     for(int k=0;k<4;k++) p->values[i][k]=knob[patch_pages[i]][k];
@@ -103,9 +115,9 @@ static void switch_engine(int next) {
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   unsigned flags=irq_save();
 #endif
-  capture_patch(&working[current]);
+  capture_patch(&working[current]);capture_tone(&tone_working[current]);
   working_valid[current]=1;
-  if (working_valid[next]) apply_patch(&working[next]);
+  if (working_valid[next]) {apply_patch(&working[next]);apply_tone(&tone_working[next]);} else apply_tone(&neutral_tone);
   if(!working_valid[next] && !next) knob[SOUND][0]=0;
   if(!working_valid[next] && next) {
     knob[ARP][0]=0;knob[ARP][1]=10;knob[ARP][2]=48;knob[ARP][3]=0;
@@ -126,7 +138,7 @@ static void recall_program(int slot) {
   unsigned flags=irq_save();
 #endif
   working_valid[0]=working_valid[1]=0;
-  apply_patch(&p);
+  apply_patch(&p);apply_tone(bank.custom[slot]==1?&tone_bank[slot]:&neutral_tone);
   if (!bank.custom[slot]) {
     const unsigned char *t=tones[slot%8], *s=spaces[slot/8];
     knob[SOUND][0]=t[0]; knob[SOUND][1]=t[1]; knob[FUZZ][0]=t[2]; knob[FUZZ][3]=t[3];
@@ -151,11 +163,13 @@ static unsigned bank_hash(unsigned generation,int with_names) {
     bytes=(const unsigned char *)names_saved;
     for(unsigned i=0;i<sizeof names_saved;i++) hash=(hash^bytes[i])*16777619u;
   }
+  if(with_names==2){bytes=(const unsigned char *)tone_bank;for(unsigned i=0;i<sizeof tone_bank;i++)hash=(hash^bytes[i])*16777619u;}
   return hash;
 }
 #define PRESET_MAGIC 0x3150544du
 #define NAMED_MAGIC 0x3250544du
-static int bank_magic(unsigned magic){return magic==PRESET_MAGIC || magic==NAMED_MAGIC;}
+#define TONE_MAGIC 0x3350544du
+static int bank_magic(unsigned magic){return magic==PRESET_MAGIC || magic==NAMED_MAGIC || magic==TONE_MAGIC;}
 static void programs_init(void) {
   capture_patch(&initial_patch);
   BankHeader h[2]={{0}};
@@ -164,35 +178,38 @@ static void programs_init(void) {
   for(int j=0;j<2;j++) {
     int i=first^j;
     if(bank_magic(h[i].magic) && !user_read(i*4096+sizeof h[i],&bank,sizeof bank)
-       && (h[i].magic!=NAMED_MAGIC || !user_read(8192+i*4096,names_saved,sizeof names_saved))
-       && bank_hash(h[i].generation,h[i].magic==NAMED_MAGIC)==h[i].checksum) {
+       && (h[i].magic==PRESET_MAGIC || !user_read(8192+i*4096,names_saved,sizeof names_saved))
+       && (h[i].magic!=TONE_MAGIC || !user_read(8192+i*4096+sizeof names_saved,tone_bank,sizeof tone_bank))
+       && bank_hash(h[i].generation,h[i].magic==TONE_MAGIC?2:h[i].magic==NAMED_MAGIC)==h[i].checksum) {
       bank_sector=i; bank_generation=h[i].generation; break;
     }
   }
   if(bank_sector<0) for(int i=0;i<PROGRAM_COUNT;i++) bank.custom[i]=0;
   if(bank_sector<0 || h[bank_sector].magic==PRESET_MAGIC)
     for(int i=0;i<PROGRAM_COUNT;i++) names_saved[i][0]=0;
+  if(bank_sector<0 || h[bank_sector].magic!=TONE_MAGIC) for(int i=0;i<PROGRAM_COUNT;i++)tone_bank[i]=neutral_tone;
   recall_program(0);
   program_notice=0;
 }
 static void save_program(void) {
   int slot=destination;
-  Patch old=bank.patch[slot];
+  Patch old=bank.patch[slot];TonePatch old_tone=tone_bank[slot];
   unsigned char custom=bank.custom[slot];
   char old_name[NAME_LEN+1]; copy_name(old_name,names_saved[slot]);
   if(deleting) {
     bank.custom[slot]=EMPTY_SLOT; names_saved[slot][0]=0;
   } else {
-    capture_patch(&bank.patch[slot]); bank.custom[slot]=1;
+    capture_patch(&bank.patch[slot]);capture_tone(&tone_bank[slot]); bank.custom[slot]=1;
     copy_name(names_saved[slot],draft[0]?draft:"Untitled");
   }
   int target=bank_sector==0?1:0;
   unsigned offset=target*4096, generation=bank_generation+1;
-  BankHeader h={NAMED_MAGIC,generation,bank_hash(generation,1)};
+  BankHeader h={TONE_MAGIC,generation,bank_hash(generation,2)};
   if(user_erase(offset) || user_erase(8192+offset) ||
      user_write(8192+offset,names_saved,sizeof names_saved) ||
+     user_write(8192+offset+sizeof names_saved,tone_bank,sizeof tone_bank) ||
      user_write(offset+sizeof h,&bank,sizeof bank) || user_write(offset,&h,sizeof h)) {
-    bank.patch[slot]=old; bank.custom[slot]=custom; copy_name(names_saved[slot],old_name);
+    tone_bank[slot]=old_tone;bank.patch[slot]=old; bank.custom[slot]=custom; copy_name(names_saved[slot],old_name);
     program_notice="SAVE FAILED";
   } else {
     bank_sector=target; bank_generation=generation;

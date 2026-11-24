@@ -162,7 +162,7 @@ def build_app():
     tc_all(*cmds)
     elf = OUT / "virgo.elf"
     tc("pi32v2/bin/ld", "--gc-sections", "-e", "_start", "-T", FW / "app.ld", OUT / "crt0.o", OUT / "fm1_vec.o",
-       OUT / "fm1_isr.o", OUT / "virgo.o", "-o", elf)
+       OUT / "fm1_isr.o", OUT / "virgo.o", str((Path("/opt/jieli") if use_docker() else toolchain()) / "pi32v2/lib/libcompiler-rt.a"), "-o", elf)
     for sect in ("text.bin", "data.bin", "ramtext.bin"):
         (OUT / sect).unlink(missing_ok=True)
     *_, syms, dis, rt = tc_all(("common/bin/objcopy", "-O", "binary", "-j", ".text", elf, OUT / "text.bin"),
@@ -291,7 +291,7 @@ def main():
         m = re.fullmatch(r"(\d)\.(\d)(\.\d)?(-[A-Za-z0-9]+)?", a.release)
         if not m:
             raise SystemExit(f"--release {a.release}: use X.Y, X.Y.Z or X.Y-suffix, one digit each")
-        PRODUCT = "FM-1_84" + m[2]
+        PRODUCT = "FM-1_" + str(840 + 10*int(m[1]) + int(m[2]))
         VERSION = m[1] + "." + m[2] + (m[3] or "") + (" BT" if a.bt else "")
         name = f"mariotronics-{a.release}{'-bluetooth' if a.bt else ''}.fwsc"
     global BT
