@@ -8,11 +8,11 @@ def contents(patterns):
     for pat in patterns.split():
         yield from sorted(root.glob(pat))
 files=contents('LICENSE LICENSING.md MARIOTRONICS.md build.sh firmware/app.ld firmware/crt0.S firmware/gen/mt_tone.h firmware/gen/mt_piano.h firmware/gen/mt_art.h firmware/gen/mt_intro.h firmware/gen/ble_rf_tables.h firmware/src/ble/* firmware/gen/felucca_font.h firmware/hal/* firmware/loader/* firmware/src/*.c firmware/src/*.h tests/host.c tests/panel-audio.cjs tests/panel-leds.cjs tests/presets.cjs tests/live-engines.cjs tests/envelope-reels.cjs tools/build.py tools/fm1pkg_make.py tools/lz4blk.py tools/get_toolchain.sh tools/tone_tables.py tools/piano.py tools/mariotronics_art.py tools/a77_panel.py assets/fripp.png assets/eno.png assets/Frippertronics.jpg assets/fonts/*LICENSE* web/fm1ota.js web/web_host.c web/mariotronics-worklet.js web/mariotronics.template.html web/make_mariotronics.py')
-src=root/'build/Mariotronics_1_1_sorgenti.zip'
+src=root/'build/Mariotronics_1_2_sorgenti.zip'
 with ZipFile(src,'w',compression=ZIP_DEFLATED) as z:
     for f in files:
         if f.is_file() and not f.name.startswith(('virgo','vgfx')):z.write(f,f.relative_to(root))
 tpl=(root/'web/mariotronics.template.html').read_text()
-for key,body in {'__OTA__':(root/'web/fm1ota.js').read_text().replace('export class','class').replace('export function','function'),'__WORKLET__':(root/'web/mariotronics-worklet.js').read_text(),'__FW__':embed(root/'build/mariotronics-1.1.fwsc'),'__WASM__':embed(root/'web/mariotronics.wasm'),'__SOURCE__':embed(src)}.items():
+for key,body in {'__OTA__':(root/'web/fm1ota.js').read_text().replace('export class','class').replace('export function','function'),'__WORKLET__':(root/'web/mariotronics-worklet.js').read_text(),'__FW__':embed(root/'build/mariotronics-1.2.fwsc'),'__WASM__':embed(root/'web/mariotronics.wasm'),'__SOURCE__':embed(src)}.items():
     assert tpl.count(key)==1;tpl=tpl.replace(key,body)
-(root/'build/Mariotronics_1_1.html').write_text(tpl)
+(root/'build/Mariotronics_1_2.html').write_text(tpl)

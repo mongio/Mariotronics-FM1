@@ -78,7 +78,7 @@ static void edit_name(int k,int d) {
 }
 typedef struct { unsigned char eq[4],filter[4]; } TonePatch;
 static const TonePatch neutral_tone={{12,12,4,12},{0,77,0,100}};
-static TonePatch tone_bank[PROGRAM_COUNT],tone_working[2];
+static TonePatch tone_bank[PROGRAM_COUNT],tone_working[3];
 static void capture_tone(TonePatch *t) {
   for(int k=0;k<4;k++){t->eq[k]=knob[EQ][k];t->filter[k]=knob[FILTER][k];}
 }
@@ -95,8 +95,8 @@ static void capture_patch(Patch *p) {
   p->values[12][1]=knob[HEAD2][0]; /* spare OFF_TAPE byte in existing patches */
   p->vibrato=128|vib_on;
 }
-static Patch working[2];
-static int working_valid[2];
+static Patch working[3];
+static int working_valid[3];
 
 static void apply_patch(const Patch *p) {
   for (unsigned i=0;i<sizeof patch_pages;i++)
@@ -125,8 +125,12 @@ static void switch_engine(int next) {
     knob[HEAD2][0]=0;knob[SOUND][0]=0;knob[ART][0]=0;
     knob[FUZZ][3]=0;knob[AMP][0]=0;knob[WAH][3]=0;vib_on=0;
   }
+  if(!working_valid[next] && next==2) {
+    knob[ENV][0]=12; knob[ENV][2]=100;
+    knob[OFF_TAPE][0]=0; knob[ARP][1]=9; knob[ARP][2]=72;
+  }
   knob[SOUND][2]=next;
-  if(page==HEAD2 && !next) page=ARP;
+  if(page==HEAD2 && next!=1) page=ARP;
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   irq_restore(flags);
 #endif
@@ -138,7 +142,7 @@ static void recall_program(int slot) {
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   unsigned flags=irq_save();
 #endif
-  working_valid[0]=working_valid[1]=0;
+  working_valid[0]=working_valid[1]=working_valid[2]=0;
   apply_patch(&p);apply_tone(bank.custom[slot]==1?&tone_bank[slot]:&neutral_tone);
   if (!bank.custom[slot]) {
     const unsigned char *t=tones[slot%8], *s=spaces[slot/8];
@@ -151,7 +155,7 @@ static void recall_program(int slot) {
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   irq_restore(flags);
 #endif
-  if(page==HEAD2 && !knob[SOUND][2]) page=ARP;
+  if(page==HEAD2 && knob[SOUND][2]!=1) page=ARP;
   program=slot;
   program_notice=bank.custom[slot]==EMPTY_SLOT?"EMPTY SLOT":bank.custom[slot]?"USER PRESET":"FACTORY PRESET";
   program_notice_time=fm1_ms;
