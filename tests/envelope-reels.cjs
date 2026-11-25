@@ -16,7 +16,7 @@ async function sound(engine,voice,adsr) {
  const attack=energy(render(8));render(12);const decay=energy(render(18));render(64);const sustain=energy(render(8));w.midi(128,60,0);render(12);const release=energy(render(8));return [attack,decay,sustain,release]
 }
 (async()=>{
- for(const [engine,voice] of [[0,0],[0,1],[1,0],[1,1],[1,2],[1,3],[2,0],[2,1]]){
+ for(const [engine,voice] of [[0,0],[0,1],[1,0],[1,1],[1,2],[1,3],[2,0],[2,1],[1,4],[1,5],[2,2],[2,3]]){
  const base=await sound(engine,voice,[0,0,35,0]),a=await sound(engine,voice,[100,0,35,0]),d=await sound(engine,voice,[0,100,35,0]),s=await sound(engine,voice,[0,0,100,0]),r=await sound(engine,voice,[0,0,35,100]);
  assert(base[0]>a[0]*1.4);assert(d[1]>base[1]*1.15);assert(s[2]>base[2]*1.2);assert(r[3]>base[3]+4);
  }
@@ -31,5 +31,5 @@ async function sound(engine,voice,adsr) {
  assert(start.equals(img()),'Reversed reels must retrace frames'); 
  w.button(11,1);w.button(11,0);tick();render(29);assert(!(w.state()&1024));assert(end.equals(img()));
  }
- console.log('ADSR measured on eight voices; ARP and SEQ deck views and both reel directions verified on all three engines.');
+ console.log('ADSR measured on twelve voices; ARP and SEQ deck views and both reel directions verified on all three engines.');
 })().catch(e=>{console.error(e);process.exitCode=1})
