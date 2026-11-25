@@ -33,7 +33,7 @@ class Mariotronics extends AudioWorkletProcessor {
     }
     if (currentTime - this.last > 0.033) {
       this.last = currentTime;
-      const g = e.fb_gen(), msg = { type: 'frame', leds: new Uint8Array(e.memory.buffer, e.leds(), 64).slice(), state: e.state() >>> 0, page: e.page(), params: [0,1,2,3].map(k=>e.param(k)) };
+      const g = e.fb_gen(), msg = { type: 'frame', leds: new Uint8Array(e.memory.buffer, e.leds(), 64).slice(), state: e.state() >>> 0, page: e.page(), voice: e.voice(), params: [0,1,2,3].map(k=>e.param(k)) };
       if (g !== this.gen) { this.gen = g; msg.fb = new Uint16Array(e.memory.buffer, e.fb(), 240 * 240).slice(); }
       const st = new Uint8Array(e.memory.buffer, e.store(), e.store_len());
       if (st[3] !== this.saves) { this.saves = st[3]; msg.light = st[4]; msg.bank=st.slice(); }

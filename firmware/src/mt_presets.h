@@ -78,7 +78,7 @@ static void edit_name(int k,int d) {
 }
 typedef struct { unsigned char eq[4],filter[4]; } TonePatch;
 static const TonePatch neutral_tone={{12,12,4,12},{0,77,0,100}};
-static TonePatch tone_bank[PROGRAM_COUNT],tone_working[3];
+static TonePatch tone_bank[PROGRAM_COUNT],tone_working[4];
 static void capture_tone(TonePatch *t) {
   for(int k=0;k<4;k++){t->eq[k]=knob[EQ][k];t->filter[k]=knob[FILTER][k];}
 }
@@ -96,9 +96,16 @@ static void capture_patch(Patch *p) {
   /* Unused SCALE and OFF_TAPE controls keep the stored patch size compatible. */
   for(int k=0;k<4;k++)p->values[k<2?4:12][2+(k%2)]=knob[PICK_ART][k];
   p->vibrato=224|vib_on;
+  if(knob[SOUND][2]){
+    p->vibrato|=16|(knob[MOTION][1]<<1);
+    p->values[4][2]=knob[MOTION][0]*81+knob[TIMBRE][0]*9+knob[TIMBRE][1];
+    p->values[4][3]=knob[ARP][0]*16+knob[ARP][1]-3;
+    p->values[12][2]=knob[ARP][2];p->values[12][3]=knob[ARP][3];
+    if(knob[SOUND][2]==1)for(int k=0;k<4;k++)p->values[11][k]=knob[NOTE_FX][k];
+  }
 }
-static Patch working[3];
-static int working_valid[3];
+static Patch working[4];
+static int working_valid[4];
 
 static void apply_patch(const Patch *p) {
   for (unsigned i=0;i<sizeof patch_pages;i++)
@@ -108,6 +115,19 @@ static void apply_patch(const Patch *p) {
   for(int k=0;k<4;k++)
     knob[PICK_ART][k]=(p->vibrato&64)?bound(p->values[k<2?4:12][2+k%2],0,maximum[PICK_ART][k]):defaults[k];
   if(!(p->vibrato&32) && !knob[SOUND][2]){knob[ART][2]=40;knob[ART][3]=9;}
+  if(knob[SOUND][2]){
+    knob[TIMBRE][0]=knob[TIMBRE][1]=4;knob[MOTION][0]=1;knob[MOTION][1]=0;
+    if(knob[SOUND][2]==1){
+      for(int k=0;k<4;k++)knob[NOTE_FX][k]=knob[ARP][k];
+      knob[ARP][0]=0;knob[ARP][1]=6;knob[ARP][2]=64;knob[ARP][3]=15;
+    }
+    if(p->vibrato&16){
+      knob[TIMBRE][0]=p->values[4][2]%81/9;knob[TIMBRE][1]=p->values[4][2]%9;
+      knob[MOTION][0]=bound(p->values[4][2]/81,0,2);knob[MOTION][1]=(p->vibrato>>1)&7;
+      knob[ARP][0]=bound(p->values[4][3]/16,0,4);knob[ARP][1]=bound(3+p->values[4][3]%16,3,16);
+      knob[ARP][2]=bound(p->values[12][2],20,95);knob[ARP][3]=bound(p->values[12][3],0,100);
+    }
+  }
   vib_on=p->vibrato & 1;
   if (!(p->vibrato & 128)) {
     knob[HOME][0]=bound((knob[SOUND][2]+1)*10,40,80);
@@ -127,6 +147,8 @@ static void switch_engine(int next) {
   if(!working_valid[next] && !next) {knob[SOUND][0]=0; knob[ART][2]=40; knob[ART][3]=9;}
   if(!working_valid[next] && next) {
     knob[ART][2]=knob[LFO][1];knob[ART][3]=knob[LFO][0];
+    knob[TIMBRE][0]=knob[TIMBRE][1]=4;knob[MOTION][0]=1;knob[MOTION][1]=0;
+    knob[NOTE_FX][0]=0;knob[NOTE_FX][1]=10;knob[NOTE_FX][2]=48;knob[NOTE_FX][3]=0;
     knob[ARP][0]=0;knob[ARP][1]=10;knob[ARP][2]=48;knob[ARP][3]=0;
     knob[ENV][0]=0;knob[ENV][1]=44;knob[ENV][2]=85;knob[ENV][3]=35;
     knob[HEAD2][0]=0;knob[SOUND][0]=0;knob[ART][0]=0;
@@ -136,9 +158,11 @@ static void switch_engine(int next) {
     knob[ENV][0]=12; knob[ENV][2]=100;
     knob[OFF_TAPE][0]=0; knob[ARP][1]=9; knob[ARP][2]=72;
   }
+  if(!working_valid[next] && next==3){knob[ENV][0]=88;knob[ENV][2]=100;knob[ENV][3]=85;}
   knob[SOUND][2]=next;
   if(page==PICK_ART && next!=0)page=ARP;
-  if(page==HEAD2 && next!=1) page=ARP;
+  if((page==NOTE_FX || page==HEAD2) && next!=1)page=SOUND;
+  if((page==TIMBRE || page==MOTION) && !next)page=SOUND;
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   irq_restore(flags);
 #endif
@@ -150,7 +174,7 @@ static void recall_program(int slot) {
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   unsigned flags=irq_save();
 #endif
-  working_valid[0]=working_valid[1]=working_valid[2]=0;
+  working_valid[0]=working_valid[1]=working_valid[2]=working_valid[3]=0;
   apply_patch(&p);apply_tone(bank.custom[slot]==1?&tone_bank[slot]:&neutral_tone);
   if (!bank.custom[slot]) {
     const unsigned char *t=tones[slot%8], *s=spaces[slot/8];
@@ -164,7 +188,8 @@ static void recall_program(int slot) {
   irq_restore(flags);
 #endif
   if(page==PICK_ART && knob[SOUND][2]!=0)page=ARP;
-  if(page==HEAD2 && knob[SOUND][2]!=1) page=ARP;
+  if((page==NOTE_FX || page==HEAD2) && knob[SOUND][2]!=1)page=SOUND;
+  if((page==TIMBRE || page==MOTION) && !knob[SOUND][2])page=SOUND;
   program=slot;
   program_notice=bank.custom[slot]==EMPTY_SLOT?"EMPTY SLOT":bank.custom[slot]?"USER PRESET":"FACTORY PRESET";
   program_notice_time=fm1_ms;

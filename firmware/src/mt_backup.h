@@ -27,6 +27,7 @@ static int valid_backup(void) {
     for(unsigned row=0;row<sizeof patch_pages;row++)for(int k=0;k<4;k++){
       int pg=patch_pages[row],v=p->values[row][k],hi=maximum[pg][k];
       if((pg==SCALE && k>=2)||(pg==OFF_TAPE && k>0))continue;
+      if(pg==ARP && !k && p->values[1][2]>=2)hi=4;
       if(pg==SOUND && k==0 && p->values[1][2])hi=p->values[1][2]==1?5:3;
       if(!(p->vibrato&128) && ((pg==SOUND && k==2)||(pg==HOME && k==0)))continue;
       if(v<minimum[pg][k] || v>hi)return 0;

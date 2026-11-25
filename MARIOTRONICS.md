@@ -11,7 +11,7 @@ EDIT opens Instrument. LFO adjusts rate, depth, wait and rise. Press LFO again o
 On Linux x86-64, use the JieLi toolchain and AC79 SDK for the firmware, and clang with wasm-ld for the emulator. Set JIELI_TOOLCHAIN and AC79_SDK before building.
 
 ```sh
-./build.sh --release 1.6
+./build.sh --release 1.7
 clang --target=wasm32 -O2 -ffreestanding -nostdlib -fno-builtin -DGRANA_WEB -Ifirmware/src -Ifirmware/gen -Wl,--no-entry -Wl,--export-memory -Wl,-z,stack-size=262144 -Wl,--initial-memory=16777216 -o web/mariotronics.wasm firmware/src/mariotronics.c
 python3 web/make_mariotronics.py
 ```
@@ -26,7 +26,7 @@ The FM-1 platform, USB/TRS MIDI and BLE central derive from VIRGO, GRANA, Felucc
 
 **Tape Character.** From HOME, press GLO once. K1 HF LOSS darkens each feedback pass, K2 SAT softens record peaks, K3 WOW and K4 FLUTTER modulate long-head playback (including HOLD and reverse). Global settings are saved after adjustment. The defaults 32/0/0/0 reproduce the previous tape response.
 
-**Algorithms.** ALGORITHM switches live between FRIPP (guitar, Mk III decks), ENO (piano and ambient voices with an animated signal diagram) and RILEY (electric organ and reed voices with vintage decks). In ENO press ARP for Note FX: direction, tone, damping and tremolo. Press ARP again for Head 2. The optional second reading runs at the original pitch over 73.1% of the tape length and defaults to OFF. All three engines share the recorded audio and transport. HOME K1 sets internal tape delay from 4.0 to 8.0 seconds. ENV K1 sets attack. Algorithm and internal delay are saved per preset. External clock and manually closed LOOP recordings retain their own timing. Each engine remembers its live edits in RAM until another preset is recalled or power is switched off. SAVE writes the active engine to the selected preset. In HOLD, play the other engine over the existing tape. In overdub, its new notes join the recording.
+Press SEL twice for a six-string fretboard in standard tuning. K1 selects the scale and K2 its root. Gold dots mark the tonic at every octave. Press EDIT repeatedly to move from the voice scope to the active voice controls. Press EDIT again for soundboard response, shimmer, chorus, tremolo, rotary, breath, bellows or slow fade, depending on the active voice. ENO continues through Note FX (note direction, tone, damping and tremolo) and Second Head. ENO and RILEY ARP K1 selects Off, Climb, Fold, Phase or Orbit. Play a single note for a generated figure or hold a chord to sequence its notes. ENO uses wide intervals and adds alternating step lengths in Phase and Orbit. RILEY uses shorter modal intervals and an even pulse. RADIGUE layers slowly beating oscillators over the same tape. Its four drone voices are Beating, Sub, Veil and Fifth. EDIT controls Beat and Color.
 
 **Pre-tape tone controls.** FX cycles through Comp, Fuzz, Wah, Amp, EQ, Filter, Off-Tape and Plate. EQ has low and high shelves (180 Hz and 4.2 kHz) and a sweepable mid band (250 Hz to 4 kHz), all ±12 dB. Filter offers Off, LP and HP, cutoff 40 Hz to 16 kHz, resonance and mix. Neutral by default, recalled per preset and per live engine.
 

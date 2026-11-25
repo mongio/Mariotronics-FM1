@@ -2,23 +2,23 @@
 
 Mariotronics turns the FM-1 into a playable guitar and tape-delay instrument inspired by Frippertronics. On power-up, the MTXT logo sits inside the left reel while a yellow cursor makes two passes around the feedback loop. The lowercase italic *mariotronics* title fades in beneath it. Two animated Revox A77s show the tape moving between the record and playback heads.
 
-**1.6 pre-release · Tested in emulation.** Installation, audio performance and BLE pairing on a physical FM-1 await verification.
+**1.7 pre-release · Tested in emulation.** Installation, audio performance and BLE pairing on a physical FM-1 await verification.
 
 ## Try it
 
-[Download the standalone editor and emulator (ZIP)](https://raw.githubusercontent.com/mongio/Mariotronics-FM1/main/downloads/Mariotronics_FM1_1_6.zip). Extract the ZIP, open **Mariotronics_1_6.html** in desktop Chrome or Edge and click **Power on**. The emulator works offline. Hold REC for 1.2 seconds to erase the tape. Powering off clears the tape in RAM.
+[Download the standalone editor and emulator (ZIP)](https://raw.githubusercontent.com/mongio/Mariotronics-FM1/main/downloads/Mariotronics_FM1_1_7.zip). Extract the ZIP, open **Mariotronics_1_7.html** in desktop Chrome or Edge and click **Power on**. The emulator works offline. Hold REC for 1.2 seconds to erase the tape. Powering off clears the tape in RAM.
 
 ## Install on FM-1
 
-Connect one powered FM-1 with a USB data cable. Open the downloaded editor, select **Install Mariotronics**, and grant MIDI SysEx access. Installation replaces the existing firmware. Leave power and USB connected until the editor reports **Installed · FM-1_856**.
+Connect one powered FM-1 with a USB data cable. Open the downloaded editor, select **Install Mariotronics**, and grant MIDI SysEx access. Installation replaces the existing firmware. Leave power and USB connected until the editor reports **Installed · FM-1_857**.
 
-[Download the firmware package](https://github.com/mongio/Mariotronics-FM1/raw/refs/heads/main/downloads/mariotronics-1.6.fwsc).
+[Download the firmware package](https://github.com/mongio/Mariotronics-FM1/raw/refs/heads/main/downloads/mariotronics-1.7.fwsc).
 
 ## Play
 
 - **EDIT** opens Instrument and selects the voice for the current algorithm.
 - **LFO** sets vibrato rate, depth, delay and rise. **ARP** alternates two held notes with a 3+3+2 accent.
-- **REC** records and overdubs. **SEQ** toggles reverse on a recorded loop. **REC** holds or resumes overdubbing on a recorded loop. HOME K1 sets Tape Delay. ALGORITHM selects FRIPP, ENO or RILEY. RILEY layers sustained Organ or Reed voices through the shared tape feedback loop and displays the vintage decks. ENO shows a moving signal diagram.
+- **REC** records and overdubs. **SEQ** toggles reverse on a recorded loop. **REC** holds or resumes overdubbing on a recorded loop. HOME K1 sets Tape Delay. ALGORITHM selects FRIPP, ENO, RILEY or RADIGUE. RILEY layers sustained Organ or Reed voices through the shared tape feedback loop and displays the vintage decks. ENO shows a moving signal diagram.
 - **FX** opens compression, fuzz, wah, amplifier and stereo plate. The plate follows the tape return, so its tail stays out of the recording.
 - **GLO** opens Tape Character. Press again for Tape Speed, then MIDI, BLE MIDI and Lights. The editor includes the CC assignments and transport instructions.
 
@@ -32,7 +32,7 @@ Connect one powered FM-1 with a USB data cable. Open the downloaded editor, sele
 
 **Tape Character.** From HOME, press GLO once. K1 HF LOSS darkens each feedback pass, K2 SAT softens record peaks, K3 WOW and K4 FLUTTER modulate long-head playback (including HOLD and reverse). Global settings are saved after adjustment. The defaults 32/0/0/0 reproduce the previous tape response.
 
-**Algorithms.** ALGORITHM switches live between FRIPP (guitar, Mk III decks) and ENO (Piano, Bright Piano, Glass Bell, Tape Choir and vintage decks). In ENO press ARP for Note FX: direction, tone, damping and tremolo. Press ARP again for Head 2. The optional second reading runs at the original pitch over 73.1% of the tape length and defaults to OFF. Both engines share the recorded audio and transport. HOME K1 sets internal tape delay from 4.0 to 8.0 seconds. ENV K1 sets attack. Algorithm and internal delay are saved per preset. External clock and manually closed LOOP recordings retain their own timing. Each engine remembers its live edits in RAM until another preset is recalled or power is switched off. SAVE writes the active engine to the selected preset. In HOLD, play the other engine over the existing tape. In overdub, its new notes join the recording.
+Press SEL twice for a six-string fretboard in standard tuning. K1 selects the scale and K2 its root. Gold dots mark the tonic at every octave. Press EDIT repeatedly to move from the voice scope to the active voice controls. Press EDIT again for soundboard response, shimmer, chorus, tremolo, rotary, breath, bellows or slow fade, depending on the active voice. ENO continues through Note FX (note direction, tone, damping and tremolo) and Second Head. ENO and RILEY ARP K1 selects Off, Climb, Fold, Phase or Orbit. Play a single note for a generated figure or hold a chord to sequence its notes. ENO uses wide intervals and adds alternating step lengths in Phase and Orbit. RILEY uses shorter modal intervals and an even pulse. RADIGUE layers slowly beating oscillators over the same tape. Its four drone voices are Beating, Sub, Veil and Fifth. EDIT controls Beat and Color.
 
 **Pre-tape tone controls.** FX cycles through Comp, Fuzz, Wah, Amp, EQ, Filter, Off-Tape and Plate. EQ has low and high shelves (180 Hz and 4.2 kHz) and a sweepable mid band (250 Hz to 4 kHz), all ±12 dB. Filter offers Off, LP and HP, cutoff 40 Hz to 16 kHz, resonance and mix. Neutral by default, recalled per preset and per live engine.
 
