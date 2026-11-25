@@ -37,6 +37,6 @@ async function boot(saved){
   assert(!loud.equals(e.image()),'GLO follows master output level');
   e.press(10);assert.equal(e.w.page(),13);e.press(10);assert.equal(e.w.page(),20);
   e.w.set_param(3,11);e.press(8);e.press(3);e.press(3);e.press(3);
-  assert.equal(e.w.page(),20);assert.equal(e.w.param(3),11);
-  console.log('EDIT scope, post-master stereo display, shared SEL/ARP controls, incomplete restore and all 64 slots after reboot verified.');
+  assert.equal(e.w.page(),2);assert.equal(e.w.param(3),9);e.w.set_param(3,3);e.press(10);e.press(10);assert.equal(e.w.param(3),11);
+  console.log('EDIT scope, post-master stereo display, independent SEL/ARP controls, incomplete restore and all 64 slots after reboot verified.');
 })().catch(err=>{console.error(err);process.exitCode=1});

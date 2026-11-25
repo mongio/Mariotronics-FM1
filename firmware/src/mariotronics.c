@@ -12,6 +12,7 @@
 #include "mt_intro.h"
 #include "mt_piano.h"
 #include "mt_vu.h"
+#include "mt_global.h"
 
 #ifndef RING_PUBLISH
 #define RING_PUBLISH()                                                         \
@@ -29,18 +30,18 @@
 static int16_t tape[CAPACITY] POOLMEM;
 enum { STOP, RECORD, DUB, HOLD };
 enum { SINGING = 4, HOLLOW = 5, PIANO = 6, BRIGHT, GLASS_BELL, TAPE_CHOIR, RHODES, BOWED, ORGAN, REED, REED_ORGAN, HARMONIUM };
-enum { HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, MIDI, BT, ARP, OFF_TAPE, LIGHTS, CHARACTER, EQ, FILTER, HEAD2, PICK_ART, ERASE, PAGE_COUNT };
-static const char *const pages[] = {"TAPE", "INSTRUMENT", "PHRASING", "FUZZ", "SCALES", "WAH", "AMP", "PLATE", "ENV","COMP","LFO","MIDI","BLE MIDI","ARP","OFF-TAPE","LIGHTS","TAPE CHAR","EQ","FILTER","HEAD 2","PICK ART","ERASE"};
+enum { HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, MIDI, BT, ARP, OFF_TAPE, LIGHTS, CHARACTER, EQ, FILTER, HEAD2, PICK_ART, ERASE, SPEED, PAGE_COUNT };
+static const char *const pages[] = {"TAPE", "INSTRUMENT", "PHRASING", "FUZZ", "SCALES", "WAH", "AMP", "PLATE", "ENV","COMP","LFO","MIDI","BLE MIDI","ARP","OFF-TAPE","LIGHTS","TAPE CHAR","EQ","FILTER","HEAD 2","ARP PICK","ERASE","SPEED"};
 static const char *const names[][4] = {{"DELAY", "FDBK", "SEND", "RETURN"},
                                        {"VOICE", "DRIVE", "ENGINE", "MODE"},
-                                       {"GLISS", "MS", "CENT", "HZ"}, {"DRIVE","TONE","BIAS","MIX"}, {"MODE","ROOT"}, {"SWEEP","RES","TONE","MIX"}, {"GAIN","BASS","TREBLE","VOL"}, {"MIX","DECAY","DAMP","PRE ms"}, {"A ms","D ms","S %","R ms"},{"THRESH","RATIO","REL ms","GAIN"},{"HZ","CENT","WAIT ms","RISE ms"},{"RX CH","CC IN","SYNC","BEATS"},{"RADIO","DEVICE"},{"PLAY","HZ","GATE %","ACCENT"},{"LEVEL %"},{"KEYS"},{"HF LOSS","SAT","WOW","FLUTTER"},{"LOW","MID","MID Hz","HIGH"},{"TYPE","CUT Hz","RES","MIX %"},{"HEAD 2"},{"WAIT ms","RISE ms","LEGATO","SEMI"},{"MODE","ARM"}};
+                                       {"GLISS", "MS", "CENT", "HZ"}, {"DRIVE","TONE","BIAS","MIX"}, {"MODE","ROOT"}, {"SWEEP","RES","TONE","MIX"}, {"GAIN","BASS","TREBLE","VOL"}, {"MIX","DECAY","DAMP","PRE ms"}, {"A ms","D ms","S %","R ms"},{"THRESH","RATIO","REL ms","GAIN"},{"HZ","CENT","WAIT ms","RISE ms"},{"RX CH","CC IN","SYNC","BEATS"},{"RADIO","DEVICE"},{"PLAY","HZ","GATE %","ACCENT"},{"LEVEL %"},{"KEYS"},{"HF LOSS","SAT","WOW","FLUTTER"},{"LOW","MID","MID Hz","HIGH"},{"TYPE","CUT Hz","RES","MIX %"},{"HEAD 2"},{"WAIT ms","RISE ms","LEGATO","SEMI"},{"MODE","ARM"},{"cm/s","MODE"}};
 static volatile int knob[][4] = {
-    {40, 81, 80, 72}, {0, 55, 0, 0}, {1, 24, 22, 5}, {54,45,18,42}, {0,6}, {40,52,60,0}, {32,48,42,85}, {19,72,52,18}, {38,32,84,36},{46,2,40,12},{5,22,12,20},{0,1,0,8},{0,0},{0,9,72,38},{25},{2},{32,0,0,0},{12,12,4,12},{0,77,0,100},{0},{12,36,1,7},{0,0}};
+    {40, 81, 80, 72}, {0, 55, 0, 0}, {1, 24, 22, 5}, {54,45,18,42}, {0,6}, {40,52,60,0}, {32,48,42,85}, {19,72,52,18}, {38,32,84,36},{46,2,40,12},{5,22,12,20},{0,1,0,8},{0,0},{0,9,72,38},{25},{2},{32,0,0,0},{12,12,4,12},{0,77,0,100},{0},{12,36,1,7},{0,0},{2,0}};
 static const int maximum[][4] = {{80, 100, 100, 100},
                                  {1, 100, 2, 1},
                                  
-                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8},{1,16,95,100},{100},{2},{100,100,100,100},{24,24,8,24},{2,100,100,100},{1},{100,100,1,24},{1,1}};
-static const int minimum[][4] = {{40}, {0}, {0, 1, 0, 2}, {0}, {0},{0},{0},{0},{0},{0,1,0,0},{2,0,0,0},{0,0,0,1},{0},{0,3,20,0},{0},{0},{0},{0},{0},{0},{0},{0}};
+                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8},{1,16,95,100},{100},{2},{100,100,100,100},{24,24,8,24},{2,100,100,100},{1},{100,100,1,24},{1,1},{96,1}};
+static const int minimum[][4] = {{40}, {0}, {0, 1, 0, 2}, {0}, {0},{0},{0},{0},{0},{0,1,0,0},{2,0,0,0},{0,0,0,1},{0},{0,3,20,0},{0},{0},{0},{0},{0},{0},{0},{0},{0}};
 static const char *const riley_voices[]={"ORGAN","REED","REED ORG","HARMON."};
 static const char *const ambient_voices[]={"PIANO","BRIGHT","GLASS","CHOIR","RHODES","BOW GL."};
 static const char *const voices[] = {"SING", "HOLLOW"};
@@ -87,6 +88,7 @@ typedef struct {
 } String;
 static String strings[4];
 static unsigned char held_notes[128], held_counts[128];
+static int phrase_enabled;
 static int held_size;
 static unsigned serial;
 static unsigned note_frames(int kind){return kind==GLASS_BELL || kind==TAPE_CHOIR?36015u:PIANO_FRAMES;}
@@ -149,7 +151,7 @@ static void glide_to(String *s, int note) {
   s->target_pitch = note * 4096;
   s->start_pitch = s->pitch;
   /* Control ticks run once per 16 audio samples. One knob step is 5 ms. */
-  s->glide_ticks = knob[ART][1] * 441 / 32;
+  s->glide_ticks = (phrase_enabled ? 24 : knob[ART][1]) * 441 / 32;
   if (s->kind==SINGING || s->kind==HOLLOW) {
     int distance=absolute(s->target_pitch-s->start_pitch)/4096;
     s->glide_ticks=s->glide_ticks*bound(55+distance*7,55,160)/100;
@@ -219,6 +221,7 @@ static int singing_pickup(String *s, int pluck, int drive) {
            + sinus(s->phase * 3u) * (6 + (s->bloom >> 11));
   if (s->kind==HOLLOW) tone=sinus(s->phase)*74+sinus(s->phase*3u)*36+sinus(s->phase*5u)*17;
   int held = ((tone * s->strength) >> 14) * s->bloom / 24576;
+  if(!phrase_enabled)pluck=pluck*knob[ART][2]/40;
   int input = (s->kind==HOLLOW ? pluck : pluck/2) + held;
   int pre = input * (3 + drive / 9);
   int clipped = saturate(pre + absolute(pre) / 12);
@@ -230,10 +233,13 @@ static void update_pitch(String *s) {
     s->glide_at++;
     int t=s->glide_at*1024/s->glide_ticks;
     if(s->kind==SINGING || s->kind==HOLLOW)
-      t=(t*t/1024)*(3072-2*t)/1024;
+      {
+        int eased=(t*t/1024)*(3072-2*t)/1024;
+        t+=(eased-t)*(phrase_enabled?7:knob[ART][3]-2)/7;
+      }
     s->pitch=s->start_pitch+(s->target_pitch-s->start_pitch)*t/1024;
   }
-  s->vibrato += (unsigned)knob[ART][3] * 1558265u;
+  s->vibrato += (unsigned)knob[LFO][0] * 1558265u;
   unsigned wait=knob[LFO][2]*441u/16u, rise=knob[LFO][3]*441u/16u;
   if (s->lfo_age < 65535) s->lfo_age++;
   unsigned elapsed=s->lfo_age>wait?s->lfo_age-wait:0;
@@ -390,6 +396,9 @@ static int string_tick(String *s) {
     picked = singing_pickup(s, picked, knob[SOUND][1]);
   return (picked * s->level) >> 15;
 }
+static int dec_samples;
+static const unsigned short speed_q8[]={64,65,67,68,70,71,73,74,76,78,79,81,83,85,87,89,91,92,95,97,99,101,103,105,108,110,112,115,117,120,123,125,128,131,134,137,140,143,146,149,152,156,159,162,166,170,173,177,181,185,189,193,197,202,206,211,215,220,225,230,235,240,245,251,256,262,267,273,279,285,292,298,304,311,318,325,332,339,347,354,362,370,378,386,395,403,412,421,431,440,450,459,470,480,490,501,512};
+static int speed_index(void){return knob[SPEED][1]?knob[SPEED][0]:32*knob[SPEED][0];}
 static int dec_sum, dec_n, prev_return, next_return, tape_lp, amp_lp;
 /* First A77 playback head, 180 ms downstream of the record head. */
 #define HEAD_SAMPLES (TAPE_RATE * 180u / 1000u)
@@ -480,7 +489,7 @@ static void rec_command(void) {
   reverse = 0;
   if (transport == STOP && !has_loop) {
     position = 0;
-    dec_n = dec_sum = prev_return = next_return = tape_lp = 0;
+    dec_samples = dec_n = dec_sum = prev_return = next_return = tape_lp = 0;
     loop_mode = knob[SOUND][3];
     length = loop_mode ? CAPACITY : beat_length();
     transport = RECORD;
@@ -516,7 +525,7 @@ static void erase_loop(void) {
   transport = STOP;
   has_loop = 0;
   position = 0;
-  next_return = prev_return = tape_lp = dec_sum = dec_n = 0;
+  next_return = prev_return = tape_lp = dec_samples = dec_sum = dec_n = 0;
 }
 static int saturate(int x) {
   int a = absolute(x);
@@ -559,7 +568,7 @@ static int instrument_fx(int sample) {
 }
 /* Keep the played notes separate from the voice currently picked by the phrase. */
 static unsigned char phrase_keys[128], phrase_count[128], phrase_velocity[128];
-static int phrase_size, phrase_enabled, phrase_step, phrase_left, phrase_gate;
+static int phrase_size, phrase_step, phrase_left, phrase_gate;
 static int phrase_wait, phrase_gain=1048576, phrase_rise_step;
 static void phrase_start(void) {
   int fripp=knob[SOUND][2]==0;
@@ -633,7 +642,7 @@ static volatile unsigned scope_head;
 static volatile int meter_level[2];
 static volatile unsigned meter_peak_time[2];
 static volatile unsigned meter_peak_valid;
-static int arp_art_access;
+
 static volatile unsigned audio_ready;
 static void app_audio(int32_t *out, uint32_t n) {
   if (!audio_ready) return; /* Platform supplies a cleared buffer during startup. */
@@ -663,7 +672,8 @@ static void app_audio(int32_t *out, uint32_t n) {
   int hf_coefficient=256-2*knob[CHARACTER][0], saturation=knob[CHARACTER][1];
   int wow=knob[CHARACTER][2], flutter=knob[CHARACTER][3];
   unsigned scope_write=scope_head;
-  int monitor_voice=page==SOUND, monitor_mix=page==MIDI || page==BT || page==LIGHTS || page==CHARACTER;
+  int monitor_voice=page==SOUND, monitor_mix=page==CHARACTER;
+  int tape_rate=speed_q8[bound(speed_index(),0,96)];
   unsigned sums[2]={0,0}, peaks[2]={0,0};
   for (unsigned i = 0; i < n; i++) {
     if(phrase_enabled)phrase_tick();
@@ -684,10 +694,12 @@ static void app_audio(int32_t *out, uint32_t n) {
     else if(phrase_enabled && phrase_gain<1048576) dry=dry*(phrase_gain>>10)/1024;
     int send = dry * knob[HOME][2] / 100, ret = 0;
     if (transport != STOP) {
-      ret = prev_return + (next_return - prev_return) * dec_n / 3;
+      ret = prev_return + (next_return - prev_return) * dec_n / 768;
       dec_sum += send;
-      if (++dec_n == 3) {
-        dec_n = 0;
+      dec_samples++;
+      dec_n+=tape_rate;
+      if (dec_n>=768) {
+        dec_n-=768;
         int old = position >= valid_samples ? 0 : tape[position];
         old=read_transport(old,wow,flutter);
         prev_return = next_return;
@@ -712,7 +724,7 @@ static void app_audio(int32_t *out, uint32_t n) {
           if(position==valid_samples)valid_samples++;
         }else if (transport != HOLD) {
           tape_lp += (old - tape_lp) * hf_coefficient / 256;
-          int write = dec_sum / 3 + tape_lp * knob[HOME][1] / 100;
+          int write = dec_sum / dec_samples + tape_lp * knob[HOME][1] / 100;
           tape[position] = (int16_t)tape_record_level(write,saturation);
           advance_head(tape[position]);
           if (position == valid_samples)
@@ -720,7 +732,7 @@ static void app_audio(int32_t *out, uint32_t n) {
         } else {
           advance_head(0);
         }
-        dec_sum = 0;
+        dec_samples=dec_sum = 0;
         if (reverse && transport == HOLD) {
           position = position ? position - 1 : length - 1;
         } else if (++position >= length) {
@@ -737,7 +749,7 @@ static void app_audio(int32_t *out, uint32_t n) {
     }
     if (absolute(ret) > peak_out)
       peak_out = absolute(ret);
-    int head = head_previous + (head_filtered - head_previous) * dec_n / 3;
+    int head = head_previous + (head_filtered - head_previous) * dec_n / 768;
     int mix = dry + ret * knob[HOME][3] / 100 + head * knob[OFF_TAPE][0] / 100;
     if (plate_half) plate_tick((plate_input+mix)/4,decay,damping,predelay);
     plate_input=mix;
@@ -786,6 +798,11 @@ static void number(char *s, int n) {
   s[k++] = '0' + n % 10;
   s[k] = 0;
 }
+static void speed_label(char *s){
+  unsigned q=speed_q8[bound(speed_index(),0,96)],v=(q*1900+128)/256;
+  unsigned whole=v/100;number(s,whole);int n=whole>=10?2:1;
+  s[n++]='.';s[n++]='0'+(v/10)%10;s[n++]='0'+v%10;s[n]=0;
+}
 static const char *value_text(int k, char *s) {
   int v = knob[page][k];
   if(page==LIGHTS) { static const char *const levels[]={"OFF","HALF","FULL"}; return levels[v]; }
@@ -799,6 +816,8 @@ static const char *value_text(int k, char *s) {
     }
     if(page==EQ) {int gain=v-12;s[0]=gain<0?'-':'+';number(s+1,absolute(gain));return s;}
   }
+  if(page==SPEED){if(k)return v?"VAR":"STEP";speed_label(s);return s;}
+  if(page==ART && !knob[SOUND][2] && k>=2){number(s,k==2?v*100/40:(v-2)*100/7);return s;}
   if(page==ERASE)return k?(v?"ARMED":"OFF"):(v?"RANGE":"ALL");
   if(page==PICK_ART && k==2)return v?"ON":"OFF";
   if(page==PICK_ART && k<2){if(v==100)return "1000";number(s,10*v);return s;}
@@ -1014,6 +1033,35 @@ static void stereo_vu(void) {
     lettering(cx,95,ch?"R":"L",silver,0);
   }
 }
+static void panel_art(const uint8_t *data,int x,int y,int lamp){
+  unsigned count=0;int col=0;
+  for(unsigned i=0;count<10000;i++){
+    int code=data[i],shade=code&15;
+    if(lamp>=0 && shade>=11 && lamp<2)shade=lamp?shade-2:5;
+    uint16_t color=swap16(panel_colors[shade]);
+    for(int n=0;n<=(code>>4);n++){
+      cv_px[y*240+x+col]=color;count++;
+      if(++col==100){col=0;y++;}
+    }
+  }
+}
+static void speed_dial(void){
+  panel_art(dial_art,70,21,-1);
+  int a=((-96+speed_index()*2)+256)&255;
+  int dx=sine256[a],dy=-sine256[(a+64)&255];
+  cv_line(120+dx*14/127,71+dy*14/127,120+dx*31/127,71+dy*31/127,gold);
+  lettering(46,83,"4.75",silver,0);lettering(74,3,"9.5",silver,0);
+  lettering(164,3,"19",silver,0);lettering(194,83,"38",silver,0);
+  lettering(120,123,"TAPE SPEED",silver,0);
+}
+static void bluetooth_mark(void){
+  uint16_t c=RGB(90,175,226);
+  for(int i=0;i<3;i++){
+    cv_line(66+i,29,66+i,99,c);cv_line(66+i,29,84+i,47,c);
+    cv_line(84+i,47,48+i,82,c);cv_line(48+i,46,84+i,82,c);
+    cv_line(84+i,82,66+i,99,c);
+  }
+}
 static void note_label(int x,int note,uint16_t color) {
   char label[8];const char *p=tonic_names[note%12];int j=0;
   while(*p)label[j++]=*p++;
@@ -1044,7 +1092,17 @@ static void draw(void) {
   static const char *const modes[] = {"STOP", "REC", "DUB", "HOLD"};
   unsigned t = transport;
   cv_begin(240, 146, 0);
-  if(page==ERASE){
+  if(page==SPEED)speed_dial();
+  else if(page==ART && !knob[SOUND][2]){
+    lettering(120,16,"MANUAL TOUCH",gold,0);
+    int last=104;
+    for(int i=0;i<=160;i++){
+      int smooth=i*i*(480-2*i)/(160*160);
+      int curve=i+(smooth-i)*(knob[ART][3]-2)/7;
+      int y=104-curve*52/160;
+      if(i)cv_line(39+i,last,40+i,y,silver);last=y;
+    }
+  }else if(page==ERASE){
     lettering(120,28,"ERASE HEAD",gold,0);
     lettering(120,71,range_down?"ERASING":knob[ERASE][0]?(knob[ERASE][1]?"HOLD REC TO ERASE":"ARM WITH K2"):"HOLD REC 1.2s",silver,0);
   }else if(page==SOUND)voice_scope();
@@ -1075,7 +1133,10 @@ static void draw(void) {
     }
     lettering(32,122,"40 Hz",silver,0);lettering(203,122,"16 kHz",silver,0);
   } else if(page==CHARACTER || page==LIGHTS || page==BT || page==MIDI) {
-    stereo_vu();
+    if(page==CHARACTER)stereo_vu();
+    else if(page==LIGHTS)panel_art(bulb_art,70,12,knob[LIGHTS][0]);
+    else if(page==MIDI)panel_art(din_art,70,12,-1);
+    else {bluetooth_mark();panel_art(din_art,100,12,-1);}
     const char *status=page==MIDI?(beat_ms && knob[MIDI][2]?"CLOCK LOCKED":"MIDI INPUT"):
                        page==CHARACTER?"TAPE CHARACTER":page==LIGHTS?"KEY BACKLIGHT":"SYSTEM MIDI PORTS";
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
@@ -1158,7 +1219,7 @@ static void draw(void) {
     cv_blit(0,146);return;
   }
   lettering(155,0,slot_id,silver,ink);
-  lettering(46,0,page==ARP && knob[SOUND][2]==1?"NOTE FX":pages[page],gold,ink);
+  lettering(46,0,page==ARP && knob[SOUND][2]==1?"NOTE FX":page==ART && !knob[SOUND][2]?"SEL TOUCH":page==ARP && !knob[SOUND][2]?"ARP RATE":pages[page],gold,ink);
   if(t==HOLD) cv_rect(178,0,56,18,gold);
   lettering(204,0,(reverse && t==HOLD)?"REV":modes[t],t==HOLD?ink:silver,t==HOLD?gold:ink);
   int width = length ? position * 228u / length : 0;
@@ -1166,16 +1227,18 @@ static void draw(void) {
   cv_rect(6, 19, width, 2, gold);
   for (int k = 0; k < 4; k++) {
     if ((page == OFF_TAPE || page == LIGHTS || page == HEAD2) && k > 0) break;
-    if ((page == SCALE || page == BT || page==ERASE) && k >= 2) break;
-    int x = (page == SCALE || page == BT || page==ERASE) ? 60 + 120 * k : 30 + 60 * k;
+    if ((page == SCALE || page == BT || page==ERASE || page==SPEED) && k >= 2) break;
+    int x = (page == SCALE || page == BT || page==ERASE || page==SPEED) ? 60 + 120 * k : 30 + 60 * k;
     int v = knob[page][k], lo = minimum[page][k], hi = page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?5:3):maximum[page][k];
+    if(page==SPEED && !k && !knob[SPEED][1])hi=3;
     int h = 29 * (v - lo) / (hi - lo);
     cv_rect(x - 4, 26, 8, 30, metal);
     cv_rect(x - 4, 56 - h, 8, h, gold);
     char val[8];
     lettering(x,55,value_text(k,val),silver,ink);
     static const char *const piano_fx[]={"DIR","TONE","DAMP","TREM"};
-    lettering(x,73,page==ARP && knob[SOUND][2]==1?piano_fx[k]:names[page][k],gold,ink);
+    static const char *const manual[]={"GLISS","MS","PICK %","CURVE"};
+    lettering(x,73,page==ART && !knob[SOUND][2]?manual[k]:page==ARP && knob[SOUND][2]==1?piano_fx[k]:names[page][k],gold,ink);
   }
   cv_blit(0, 146);
 }
@@ -1212,8 +1275,9 @@ static void post(int type, int a, int b) {
 }
 static void apply_events(void) {
   static int last_glide = 1;
-  if (panic || last_glide != knob[ART][0]) {
-    last_glide = knob[ART][0];
+  int manual_glide = (knob[SOUND][2]!=1 && knob[ARP][0]) ? 0 : knob[ART][0];
+  if (panic || last_glide != manual_glide) {
+    last_glide = manual_glide;
     held_size = 0;
     for (int j = 0; j < 128; j++) held_counts[j] = 0;
     for (int j = 0; j < 4; j++)
@@ -1244,7 +1308,7 @@ static void apply_events(void) {
     case EV_PLAY:
       play_command();
       break;
-    case EV_START: layer_pos=position=0;dec_n=dec_sum=prev_return=next_return=0;
+    case EV_START: layer_pos=position=0;dec_samples=dec_n=dec_sum=prev_return=next_return=0;
       /* fall through */
     case EV_CONTINUE: if(has_loop) transport=HOLD;else if(transport==STOP)rec_command(); break;
     case EV_STOP: transport=STOP;break;
@@ -1273,7 +1337,7 @@ static void set_key_backlight(int level) {
   fm1_led_bg_ns = ns[level];
   for (unsigned k = 0; k < 27; k++) fm1_led_back(KEY_LED(k), level != 0);
 }
-static unsigned char globals[5]={2,32,0,0,0};
+static unsigned char globals[7]={2,32,0,0,0,2,0};
 static int globals_changed;
 static unsigned light_changed;
 static uint16_t midi_lit[128];
@@ -1281,10 +1345,10 @@ static uint16_t midi_lit[128];
 static void update_leds(unsigned keys) {
   static const unsigned char page_button[PAGE_COUNT] = {
     BTN_HOME, BTN_EDIT, BTN_SEL, BTN_FX, BTN_SEL, BTN_FX, BTN_FX, BTN_FX,
-    BTN_ENV, BTN_FX, BTN_LFO, BTN_GLO, BTN_GLO, BTN_ARP, BTN_FX, BTN_GLO, BTN_GLO, BTN_FX, BTN_FX, BTN_ARP, BTN_SEL, BTN_REC
+    BTN_ENV, BTN_FX, BTN_LFO, BTN_GLO, BTN_GLO, BTN_ARP, BTN_FX, BTN_GLO, BTN_GLO, BTN_FX, BTN_FX, BTN_ARP, BTN_ARP, BTN_REC, BTN_GLO
   };
   static unsigned previous_keys, previous_buttons;
-  unsigned buttons = 1u << (page==PICK_ART && arp_art_access ? BTN_ARP : page_button[page]);
+  unsigned buttons = 1u << page_button[page];
   unsigned t = transport;
   if (vib_on) buttons |= 1u << BTN_LFO;
   if (t==HOLD && reverse) buttons |= 1u << BTN_SEQ;
@@ -1312,8 +1376,11 @@ static void update_leds(unsigned keys) {
 }
 static void app_setup(void) {
   for(unsigned i=0;i<1024;i++)scope_ring[i]=0;
-  unsigned char stored[5];
-  if(!settings_load(stored,sizeof stored) && stored[0]<=2) {
+  unsigned char stored[7];
+  if(!settings_load(stored,7) && stored[6]<=1 && stored[5]<=(stored[6]?96:3)){
+    globals[5]=knob[SPEED][0]=stored[5];globals[6]=knob[SPEED][1]=stored[6];
+  }
+  if((!settings_load(stored,7) || !settings_load(stored,5)) && stored[0]<=2) {
     globals[0]=stored[0];
     for(int i=1;i<5;i++) if(stored[i]<=100)globals[i]=stored[i];
   } else if(!settings_load(stored,1) && stored[0]<=2) globals[0]=stored[0];
@@ -1337,6 +1404,14 @@ static void set_control(int k,int v) {
     v=0;
 #endif
   }
+  if(page==SPEED){
+    if(k>1)return;
+    int index=bound(speed_index(),0,96);
+    int mode=k==1?bound(v,0,1):knob[SPEED][1];
+    int rate=k==0?bound(v,0,mode?96:3):(mode?index:(index+16)/32);
+    globals[5]=knob[SPEED][0]=rate;globals[6]=knob[SPEED][1]=mode;
+    globals_changed=1;light_changed=fm1_ms;return;
+  }
   if(page==LIGHTS && k==0 && knob[LIGHTS][0]!=bound(v,0,2)) {
     globals_changed=1; light_changed=fm1_ms;
     globals[0]=bound(v,0,2);
@@ -1346,8 +1421,8 @@ static void set_control(int k,int v) {
     globals[1+k]=bound(v,0,100); globals_changed=1; light_changed=fm1_ms;
   }
   knob[page][k]=bound(v,minimum[page][k],page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?5:3):maximum[page][k]);
-  if(page==LFO && k<2) knob[ART][3-k]=knob[LFO][k];
-  if(page==ART && k>=2) knob[LFO][3-k]=knob[ART][k];
+  if(knob[SOUND][2] && page==LFO && k<2) knob[ART][3-k]=knob[LFO][k];
+  if(knob[SOUND][2] && page==ART && k>=2) knob[LFO][3-k]=knob[ART][k];
 
 }
 static unsigned last_tick,beat_start,ticks;
@@ -1376,7 +1451,7 @@ static void midi_input(unsigned src,unsigned st,unsigned a,unsigned b) {
   if(!knob[MIDI][1])return;
   int v=(b*100+63)/127;
   switch(a){
-    case 1:knob[LFO][1]=knob[ART][2]=b*80/127;break;
+    case 1:knob[LFO][1]=b*80/127;if(knob[SOUND][2])knob[ART][2]=knob[LFO][1];break;
     case 7:knob[AMP][3]=v;break;
     case 11:knob[HOME][2]=v;break;
     case 20:knob[FUZZ][0]=v;break;
@@ -1405,12 +1480,11 @@ static void app_step(void) {
   if (edge & (1u << BTN_LFO)) { if(page==LFO) vib_on=!vib_on; page=LFO; }
   if (edge & (1u << BTN_EDIT))
     page = SOUND;
-  if(edge & (1u<<BTN_SEL))arp_art_access=0;
-  if (edge & (1u << BTN_SEL)) page = page==ART ? SCALE : page==SCALE && knob[SOUND][2]==0 ? PICK_ART : ART;
-  if (edge & (1u << BTN_GLO)) page = page==MIDI ? BT : page==BT ? LIGHTS : page==LIGHTS ? CHARACTER : MIDI;
+  if (edge & (1u << BTN_SEL)) page = page==ART ? SCALE : ART;
+  if (edge & (1u << BTN_GLO)) page = page==CHARACTER ? SPEED : page==SPEED ? MIDI : page==MIDI ? BT : page==BT ? LIGHTS : CHARACTER;
   if(edge & (1u<<BTN_ARP)) {
-    if(knob[SOUND][2]==0 && page==ARP){page=PICK_ART;arp_art_access=1;}
-    else if(knob[SOUND][2]==0 && page==PICK_ART){page=ARP;arp_art_access=0;}
+    if(knob[SOUND][2]==0 && page==ARP){page=PICK_ART;}
+    else if(knob[SOUND][2]==0 && page==PICK_ART){page=ARP;}
     else if(knob[SOUND][2]==1) page=page==ARP ? HEAD2 : ARP;
     else { knob[ARP][0]=!knob[ARP][0]; page=ARP; }
   }
@@ -1443,10 +1517,10 @@ static void app_step(void) {
   if (d)
     {
       int last=knob[SOUND][2]==2 ? HEAD2 : HEAD2+1;
-      int count=last+1;
-      int index=page==ERASE?last:page==PICK_ART?HEAD2:page;
+      int count=last+2;
+      int index=page==SPEED?last:page==ERASE?last+1:page==PICK_ART?HEAD2:page;
       index=((index+d)%count+count)%count;
-      page=index==last?ERASE:index==HEAD2 && knob[SOUND][2]==0 ? PICK_ART : index;
+      page=index==last+1?ERASE:index==last?SPEED:index==HEAD2 && knob[SOUND][2]==0 ? PICK_ART : index;
     }
   d = fm1_enc_take(ENC_ALGORITHM);
   if(d)intro=0;

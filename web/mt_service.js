@@ -1,4 +1,4 @@
-const targetIdentity='FM-1_855';
+const targetIdentity='FM-1_856';
 const isFm1=id=>id.model==='FM-1'||id.model==='ota-FM-1';
 let servicing=false;
 async function service(status,action){
@@ -24,7 +24,7 @@ $('install').onclick=()=>service('installNote',async msg=>{
   const {dev,up}=await usbDevice();
   const loader=dev.id.model==='ota-FM-1';
   const identity=dev.name+' · '+dev.id.text;
-  msg.textContent=identity+' → Mariotronics 1.5 · '+targetIdentity;
+  msg.textContent=identity+' → Mariotronics 1.6 · '+targetIdentity;
   const leave=e=>{e.preventDefault();e.returnValue='';};
   let lock,paused=false;
   try{
@@ -65,7 +65,7 @@ async function presetConnection(){
     },commit(){localStorage.setItem('mt.programBank.v1',btoa(String.fromCharCode(...store)));}};
   }
   const {dev}=await usbDevice();
-  if(dev.id.text!==targetIdentity && dev.id.text!=="FM-1_854"){dev.link.close();throw Error('USB preset transfer requires a running Mariotronics 1.4 or 1.5.');}
+  if(dev.id.text!==targetIdentity && dev.id.text!=="FM-1_855" && dev.id.text!=="FM-1_854"){dev.link.close();throw Error('USB preset transfer requires a running Mariotronics 1.4 through 1.6.');}
   return {name:dev.id.text,close:()=>dev.link.close(),commit(){},async request(frame){
     dev.link.drain();
     if(!dev.link.send([0xf0,...frame,0xf7]))throw Error('FM-1 disconnected.');

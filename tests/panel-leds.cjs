@@ -12,8 +12,8 @@ async function check() {
   const leds = new Uint8Array(w.memory.buffer,w.leds(),41);
   step();
   assert.equal(leds[8],3);
-  for (const [button,page] of [[4,8],[3,2],[5,10],[6,1],[2,9],[7,11],[7,12],[7,15]]) {
-    press(button); assert.equal(w.state() & 15,page); assert.equal(leds[button],3);
+  for (const [button,page] of [[4,8],[3,2],[5,10],[6,1],[2,9],[7,16],[7,22],[7,11],[7,12],[7,15]]) {
+    press(button); assert.equal(w.page(),page); assert.equal(leds[button],3);
     assert.equal(leds[8],0);
   }
   for (const level of [0,1,2]) {

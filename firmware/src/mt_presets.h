@@ -95,7 +95,7 @@ static void capture_patch(Patch *p) {
   p->values[12][1]=knob[HEAD2][0]; /* spare OFF_TAPE byte in existing patches */
   /* Unused SCALE and OFF_TAPE controls keep the stored patch size compatible. */
   for(int k=0;k<4;k++)p->values[k<2?4:12][2+(k%2)]=knob[PICK_ART][k];
-  p->vibrato=192|vib_on;
+  p->vibrato=224|vib_on;
 }
 static Patch working[3];
 static int working_valid[3];
@@ -107,6 +107,7 @@ static void apply_patch(const Patch *p) {
   static const unsigned char defaults[]={12,36,1,7};
   for(int k=0;k<4;k++)
     knob[PICK_ART][k]=(p->vibrato&64)?bound(p->values[k<2?4:12][2+k%2],0,maximum[PICK_ART][k]):defaults[k];
+  if(!(p->vibrato&32) && !knob[SOUND][2]){knob[ART][2]=40;knob[ART][3]=9;}
   vib_on=p->vibrato & 1;
   if (!(p->vibrato & 128)) {
     knob[HOME][0]=bound((knob[SOUND][2]+1)*10,40,80);
@@ -123,8 +124,9 @@ static void switch_engine(int next) {
   capture_patch(&working[current]);capture_tone(&tone_working[current]);
   working_valid[current]=1;
   if (working_valid[next]) {apply_patch(&working[next]);apply_tone(&tone_working[next]);} else apply_tone(&neutral_tone);
-  if(!working_valid[next] && !next) knob[SOUND][0]=0;
+  if(!working_valid[next] && !next) {knob[SOUND][0]=0; knob[ART][2]=40; knob[ART][3]=9;}
   if(!working_valid[next] && next) {
+    knob[ART][2]=knob[LFO][1];knob[ART][3]=knob[LFO][0];
     knob[ARP][0]=0;knob[ARP][1]=10;knob[ARP][2]=48;knob[ARP][3]=0;
     knob[ENV][0]=0;knob[ENV][1]=44;knob[ENV][2]=85;knob[ENV][3]=35;
     knob[HEAD2][0]=0;knob[SOUND][0]=0;knob[ART][0]=0;
@@ -156,7 +158,7 @@ static void recall_program(int slot) {
     knob[AMP][0]=t[4]; knob[AMP][2]=t[5]; knob[WAH][3]=t[6];
     knob[ENV][0]=s[0]; knob[HOME][1]=s[1]; knob[HOME][0]=10*s[2];
     knob[PLATE][0]=s[3]; knob[PLATE][1]=s[4]; knob[OFF_TAPE][0]=s[5];
-    knob[ART][1]=s[6]; knob[LFO][1]=knob[ART][2]=s[7];
+    knob[ART][1]=s[6]; knob[LFO][1]=s[7];knob[ART][2]=40;knob[ART][3]=9;
   }
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   irq_restore(flags);
