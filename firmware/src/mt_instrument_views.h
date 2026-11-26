@@ -97,6 +97,38 @@ static void pattern_view(void){
     disc(x+9,121,2,i==now?gold:RGB(50,52,48));
   }
 }
+/* ARP FEEL: the eight steps as they will fall in time. */
+static void feel_view(void){
+  int swing=knob[FEEL][0],accent=knob[FEEL][1],repeats=knob[FEEL][3],human=knob[FEEL][2];
+  int now=knob[ARP][0] && phrase_size?(int)((phrase_step+7)&7):-1;
+  lettering(120,4,"ARP FEEL",gold,0);
+  cv_rect(14,104,212,1,RGB(40,42,38));
+  int x=16;
+  for(int i=0;i<8;i++){
+    int w=26*(100+((i&1)?-swing:swing))/100;
+    int acc=accent==1?(i==0||i==3||i==6):accent==2?!(i&3):accent==3?!(i&1):0;
+    int h=acc?62:36, jitter=human?(int)((unsigned)(i*2654435761u)>>27)%(1+human/12)-human/24:0;
+    uint16_t c=i==now?gold:acc?RGB(196,170,120):metal;
+    int sub=(w-3)/repeats;
+    for(int r=0;r<repeats;r++)cv_rect(x+jitter+r*sub+1,104-h+r*4,sub-2>1?sub-2:1,h-r*4,r?RGB(110,100,80):c);
+    x+=w;
+  }
+  lettering(120,116,swing?"SWUNG PAIRS":"STRAIGHT",silver,0);
+}
+static void route_bar(int y,int target,int amount,int live){
+  char s[24];const char *name=rf_target_name(target);
+  lettering(-18,y,name,silver,0);
+  s[0]=amount<0?'-':'+';number(s+1,absolute(amount));lettering(-196,y,s,amount?gold:metal,0);
+  cv_rect(18,y+24,204,2,metal);cv_rect(119,y+20,2,10,silver);
+  int a=bound(live,-100,100);
+  if(a>0)cv_rect(120,y+21,a,8,gold);else if(a<0)cv_rect(120+a,y+21,-a,8,gold);
+}
+static void route_view(void){
+  lettering(120,4,"WI-FI MODULATION",gold,0);
+  route_bar(32,knob[ROUTE][0],knob[ROUTE][1],rf_amount);
+  route_bar(78,knob[ROUTE][2],knob[ROUTE][3],rf_amount2);
+  lettering(120,124,!knob[UNCERT][0]?"SOURCE OFF":"TWO ROUTES",silver,0);
+}
 static void instrument_diagram(void){
   int kind=voice_kind(),a=knob[TIMBRE][0],b=knob[TIMBRE][1];
   if(page==HEAD2 || page==NOTE_FX){

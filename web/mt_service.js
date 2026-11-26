@@ -104,12 +104,14 @@ $('bankWrite').onclick=()=>{$('bankFile').value='';$('bankFile').click();};
 $('bankFile').onchange=()=>service('bankStatus',async msg=>{
   const file=$('bankFile').files[0];if(!file)return;
   if(file.size>16000)throw Error('Invalid preset file size.');
-  const saved=JSON.parse(await file.text()),raw=bytes(saved.data);
+  const saved=JSON.parse(await file.text());let raw=bytes(saved.data);
   if(saved.format!=='Mariotronics presets 1'||await digest(raw)!==saved.sha256)throw Error('Invalid or damaged preset backup.');
   const conn=await presetConnection();
   try{
     if(!confirm('Replace all 64 saved preset slots on '+conn.name+' with '+file.name+'?'))return;
-    const [count]=await exchange(conn,3,0);
+    const [count,sizeHigh,sizeLow]=await exchange(conn,3,0);
+    const size=sizeHigh===undefined?raw.length:sizeHigh*128+sizeLow;
+    if(raw.length<size){const padded=new Uint8Array(size);padded.set(raw);raw=padded;}   // older backups: no ARP FEEL / routing record
     if(Math.ceil(raw.length/80)!==count)throw Error('Incompatible bank size.');
     for(let i=0;i<count;i++){
       const digits=[];for(const b of raw.slice(i*80,(i+1)*80))digits.push(b>>4,b&15);

@@ -114,7 +114,7 @@ static void air_freeze(void){
 static void air_step(int on,unsigned now){
     if(!on){
         if(air_started==1)air_stop();
-        rf_source=rf_amount=0;air_started=0;air_frozen=0;air_level=air_noise=0;return;
+        rf_source=rf_amount=rf_amount2=0;air_started=0;air_frozen=0;air_level=air_noise=0;return;
     }
     if(!air_started){
         air_started=air_hw_start()?1:-1;
@@ -162,5 +162,5 @@ static void air_step(int on,unsigned now){
     else if(noise>previous)rf_source=knob[UNCERT][1]==1?bound((target+noise)*200/255-100,-100,100):bound(20+noise*2,0,100);
     else if(knob[UNCERT][1]==2)rf_source-=1+rf_source/(2+knob[UNCERT][3]);
     if(knob[UNCERT][1]==2 && rf_source<0)rf_source=0;
-    previous=noise;rf_amount=rf_source*knob[ROUTE][1]/100;
+    previous=noise;rf_amount=rf_source*knob[ROUTE][1]/100;rf_amount2=rf_source*knob[ROUTE][3]/100;
 }

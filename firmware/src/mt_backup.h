@@ -4,6 +4,7 @@ typedef struct {
   __typeof__(bank) programs;
   char names[PROGRAM_COUNT][NAME_LEN+1];
   TonePatch tones[PROGRAM_COUNT];
+  ExtraPatch extras[PROGRAM_COUNT];   /* zeros in a padded older backup: defaults */
 } BackupBank;
 static BackupBank transfer_bank POOLMEM;
 enum { CHUNK=80, CHUNKS=(sizeof(BackupBank)+CHUNK-1)/CHUNK };
@@ -13,6 +14,7 @@ static void snapshot_bank(void) {
   for(int i=0;i<PROGRAM_COUNT;i++){
     for(int j=0;j<=NAME_LEN;j++)transfer_bank.names[i][j]=names_saved[i][j];
     transfer_bank.tones[i]=tone_bank[i];
+    transfer_bank.extras[i]=extra_bank[i];
   }
 }
 static int valid_backup(void) {
@@ -43,16 +45,18 @@ static int restore_backup(void) {
   const unsigned char *src=(const unsigned char *)&transfer_bank;
   for(unsigned i=0;i<sizeof transfer_bank;i++)hash=(hash^src[i])*16777619u;
   int target=bank_sector==0?1:0;unsigned off=target*4096;
-  BankHeader header={TONE_MAGIC,generation,hash};
+  BankHeader header={EXTRA_MAGIC,generation,hash};
   if(user_erase(off)||user_erase(8192+off)||
      user_write(off+sizeof header,&transfer_bank.programs,sizeof bank)||
      user_write(8192+off,transfer_bank.names,sizeof names_saved)||
      user_write(8192+off+sizeof names_saved,transfer_bank.tones,sizeof tone_bank)||
+     user_write(8192+off+sizeof names_saved+sizeof tone_bank,transfer_bank.extras,sizeof extra_bank)||
      user_write(off,&header,sizeof header))return 0;
   bank=transfer_bank.programs;
   for(int i=0;i<PROGRAM_COUNT;i++){
     for(int j=0;j<=NAME_LEN;j++)names_saved[i][j]=transfer_bank.names[i][j];
     tone_bank[i]=transfer_bank.tones[i];
+    extra_bank[i]=transfer_bank.extras[i];
   }
   bank_sector=target;bank_generation=generation;recall_program(program);return 1;
 }
@@ -73,6 +77,7 @@ static void app_sysex(const uint8_t *p,uint32_t n) {
     transfer_mode=op;transfer_index=0;transfer_generation=bank_generation;
     if(op==1)snapshot_bank();
     reply[len++]=CHUNKS;
+    reply[len++]=sizeof transfer_bank>>7;reply[len++]=sizeof transfer_bank&127;   /* lets the editor pad an older, shorter backup */
   }else if(op==2 && transfer_mode==1 && count && n==3){
     for(unsigned i=0;i<count;i++){
       unsigned b=data[idx*CHUNK+i];reply[len++]=b>>4;reply[len++]=b&15;
@@ -88,3 +93,4 @@ static void app_sysex(const uint8_t *p,uint32_t n) {
   }else reply[7]=1;
   reply[len++]=0xf7;sysex_send(reply,len);
 }
+_Static_assert(sizeof names_saved + sizeof tone_bank + sizeof extra_bank <= 4096, "names, tones and Lab 7 records exceed their flash sector");

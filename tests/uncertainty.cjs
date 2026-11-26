@@ -1,7 +1,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const html=fs.readFileSync(process.argv[2],'utf8');
 const bytes=Buffer.from(html.match(/wasm='([^']+)'/)[1],'base64');
-async function run(engine,target,depth,backup){
+async function run(engine,target,depth,backup,second){
   const w=(await WebAssembly.instantiate(bytes)).instance.exports;
   if(backup)new Uint8Array(w.memory.buffer,w.store(),backup.length).set(backup);
   w.init();let ms=0;
@@ -15,8 +15,9 @@ async function run(engine,target,depth,backup){
   for(let i=0;i<620;i++)tick();assert(w.rf_count()>0);
   press(5);assert.equal(w.page(),27);
   if(backup){assert.equal(w.param(0),target);assert.equal(w.param(1),depth);}
-  else{w.set_param(0,target);w.set_param(1,depth);}
+  else{w.set_param(0,target);w.set_param(1,depth);if(second){w.set_param(2,second[0]);w.set_param(3,second[1]);}}
   for(let i=0;i<16;i++)tick();
+  if(second && second[0]>=7){press(10);w.set_param(0,1);tick();}   /* arpeggio targets need the arpeggio */
   let hash=0;for(let i=0;i<130;i++){if(!(i%32))w.midi(144,59+i/32,100);
     const a=tick();for(const x of a)hash=Math.imul(hash,31)+x|0;}
   press(9);press(9);
@@ -26,5 +27,9 @@ async function run(engine,target,depth,backup){
  for(let e=0;e<5;e++){const base=await run(e,0,0);
    for(let d=0;d<4;d++){const mod=await run(e,d,-94);assert.notEqual(base.hash,mod.hash,'engine '+e+' target '+d);
      if(d===1)await run(e,d,-94,mod.store);}}
- console.log('All four RF targets change rendered audio on all five engines. Signed routes recalled after reboot.');
+ for(const e of [1,2,4]){const base=await run(e,0,0,null,[4,0]);
+   for(const t of [4,6,7,8]){   /* Tape (5) acts on the reels: not heard in this short window */
+     const engine=t>=7 && e===4?1:e, ref=engine===e?base:await run(engine,0,0,null,[t,0]);
+     const mod=await run(engine,0,0,null,[t,t===8?-90:90]);assert.notEqual(ref.hash,mod.hash,'engine '+engine+' second route target '+t);}}
+ console.log('All four RF targets change rendered audio on all five engines. Signed routes recalled after reboot. Filter, Plate, Arp Rate and Density act through the second route.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
