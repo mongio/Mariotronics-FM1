@@ -79,14 +79,36 @@ static void edit_name(int k,int d) {
 typedef struct { unsigned char eq[4],filter[4]; } TonePatch;
 static const TonePatch neutral_tone={{12,12,4,12},{0,77,0,100}};
 static TonePatch tone_bank[PROGRAM_COUNT],tone_working[5];
+/* Store the route in the unused upper bits of the existing EQ/filter bytes.
+   Legacy records have zero in those bits and recall with Wi-Fi off. */
+static const unsigned char tone_bits[]={5,5,4,5,2,7,7,7};
 static void capture_tone(TonePatch *t) {
-  for(int k=0;k<4;k++){t->eq[k]=knob[EQ][k];t->filter[k]=knob[FILTER][k];}
+  int amount=knob[ROUTE][1];
+  unsigned packed=(absolute(amount)*2-(amount<0));
+  packed=(packed<<2)|knob[ROUTE][0];
+  packed=(packed<<4)|knob[UNCERT][3];
+  packed=(packed<<4)|knob[UNCERT][2];
+  packed=(packed<<2)|knob[UNCERT][1];
+  packed=(packed<<1)|knob[UNCERT][0];
+  for(int i=0;i<8;i++){
+    unsigned n=tone_bits[i];
+    ((unsigned char *)t)[i]=knob[i<4?EQ:FILTER][i%4]|(packed<<n);
+    packed>>=8-n;
+  }
 }
 static void apply_tone(const TonePatch *t) {
-  for(int k=0;k<4;k++){
-    knob[EQ][k]=bound(t->eq[k],0,maximum[EQ][k]);
-    knob[FILTER][k]=bound(t->filter[k],0,maximum[FILTER][k]);
+  unsigned packed=0;
+  for(int i=7;i>=0;i--){
+    int pg=i<4?EQ:FILTER,k=i%4;
+    unsigned n=tone_bits[i],v=((const unsigned char *)t)[i];
+    knob[pg][k]=bound(v&((1u<<n)-1),0,maximum[pg][k]);
+    packed=(packed<<(8-n))|(v>>n);
   }
+  knob[UNCERT][0]=packed&1;knob[UNCERT][1]=bound((packed>>1)&3,0,2);
+  knob[UNCERT][2]=bound((packed>>3)&15,0,8);knob[UNCERT][3]=bound((packed>>7)&15,0,8);
+  knob[ROUTE][0]=(packed>>11)&3;
+  int z=bound(packed>>13,0,200);knob[ROUTE][1]=(z&1)?-(z+1)/2:z/2;
+  rf_amount=rf_source=0;
 }
 static void capture_patch(Patch *p) {
   for (unsigned i=0;i<sizeof patch_pages;i++)

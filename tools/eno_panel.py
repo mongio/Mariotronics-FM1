@@ -31,7 +31,7 @@ a=np.array(im).astype(int)
 pixels=((a[:,:,0]>>3)<<11)|((a[:,:,1]>>2)<<5)|(a[:,:,2]>>3)
 # Pack each glyph at its own advance. Both faces then fit in the app region.
 tables=[('uint16_t','knob_cap',pixels.ravel())]
-alpha=[];widths=[];offsets=[]
+alpha=[];widths=[];offsets=[];bounds=[]
 for path,height,baseline in [
     ('/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',13,14),
     ('/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',16,14)]:
@@ -43,8 +43,13 @@ for path,height,baseline in [
         ImageDraw.Draw(cell).text((0,baseline*scale),ch,font=font,fill=255,anchor='ls')
         raw=(np.asarray(cell.resize((width,18),Image.Resampling.LANCZOS)).astype(int).ravel()+8)//17
         offsets.append(len(alpha));widths.append(width)
+        rows=np.flatnonzero(raw.reshape(18,width).any(axis=1))
+        first=int(rows[0])//2 if len(rows) else 0
+        end=int(rows[-1])//2+1 if len(rows) else 0
+        bounds.append(first*16+end)
+        raw=raw[first*2*width:end*2*width]
         alpha.extend(16*raw[::2]+raw[1::2])
-tables.extend([('uint8_t','panel_adv',widths),('uint16_t','panel_off',offsets),('uint8_t','panel_alpha',alpha)])
+tables.extend([('uint8_t','panel_rows',bounds),('uint8_t','panel_adv',widths),('uint16_t','panel_off',offsets),('uint8_t','panel_alpha',alpha)])
 with (root/'firmware/gen/eno_panel.h').open('w') as out:
     for typ,name,data in tables:
         out.write(f'static const {typ} {name}[]={{\n')

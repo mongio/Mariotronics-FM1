@@ -57,7 +57,7 @@ static int board_tick(int excitation,int resonance){
 }
 static int pad_tick(String *s){
     if(!(s->pitch_clock++&15))update_pitch(s);
-    int a=knob[TIMBRE][0],b=knob[TIMBRE][1],c=knob[TIMBRE][2],d=knob[TIMBRE][3];
+    int a=rf_timbre(knob[TIMBRE][0]),b=knob[TIMBRE][1],c=knob[TIMBRE][2],d=knob[TIMBRE][3];
     s->phase+=s->increment;
     s->motion_phase+=2300u+(s->kind==TIDAL?d:c)*4200u;
     unsigned detune=s->kind==EVENING?(a+1)*16000u:35000u;

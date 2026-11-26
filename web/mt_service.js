@@ -1,4 +1,4 @@
-const targetIdentity='FM-1_874';
+const targetIdentity='FM-1_875';
 const isFm1=id=>id.model==='FM-1'||id.model==='ota-FM-1';
 let servicing=false;
 async function service(status,action){
@@ -65,7 +65,7 @@ async function presetConnection(){
     },commit(){localStorage.setItem('mt.programBank.v1',btoa(String.fromCharCode(...store)));}};
   }
   const {dev}=await usbDevice();
-  if(dev.id.text!==targetIdentity && dev.id.text!=="FM-1_873" && dev.id.text!=="FM-1_872" && dev.id.text!=="FM-1_871" && dev.id.text!=="FM-1_870" && dev.id.text!=="FM-1_869" && dev.id.text!=="FM-1_868" && dev.id.text!=="FM-1_857" && dev.id.text!=="FM-1_856" && dev.id.text!=="FM-1_855" && dev.id.text!=="FM-1_854"){dev.link.close();throw Error('USB preset transfer requires a running Mariotronics 1.4 through 1.7 or version 1.18.');}
+  if(dev.id.text!==targetIdentity && dev.id.text!=="FM-1_874" && dev.id.text!=="FM-1_873" && dev.id.text!=="FM-1_872" && dev.id.text!=="FM-1_871" && dev.id.text!=="FM-1_870" && dev.id.text!=="FM-1_869" && dev.id.text!=="FM-1_868" && dev.id.text!=="FM-1_857" && dev.id.text!=="FM-1_856" && dev.id.text!=="FM-1_855" && dev.id.text!=="FM-1_854"){dev.link.close();throw Error('USB preset transfer requires a running Mariotronics 1.4 through 1.7 or version 1.18.');}
   return {name:dev.id.text,close:()=>dev.link.close(),commit(){},async request(frame){
     dev.link.drain();
     if(!dev.link.send([0xf0,...frame,0xf7]))throw Error('FM-1 disconnected.');

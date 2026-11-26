@@ -18,12 +18,12 @@ static float modal_sine(unsigned phase) {
 
 static void tune_body(AirBody *body, String *s) {
     static const float plate[] = {1, 1.59f, 2.34f, 2.91f, 4.13f, 5.56f};
-    if (body->tuned_pitch == s->increment && body->material == knob[TIMBRE][2] &&
+    if (body->tuned_pitch == s->increment && body->material == rf_timbre(knob[TIMBRE][2]) &&
         body->ring == knob[TIMBRE][3]) return;
     body->tuned_pitch = s->increment;
-    body->material = knob[TIMBRE][2];
+    body->material = rf_timbre(knob[TIMBRE][2]);
     body->ring = knob[TIMBRE][3];
-    float material = knob[TIMBRE][2] / 8.0f;
+    float material = rf_timbre(knob[TIMBRE][2]) / 8.0f;
     int ring = knob[TIMBRE][3];
     for (int i = 0; i < MODE_COUNT; ++i) {
         AirMode *m = &body->mode[i];

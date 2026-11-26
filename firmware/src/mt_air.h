@@ -43,7 +43,7 @@ static void air_receive(const uint8_t *frame,unsigned length,int dbm,unsigned ch
     unsigned slot=air_count;
     if(slot==8){
         for(slot=0;slot<8;slot++)
-            if((int)slot!=knob[TIMBRE][0]-1 && now-air_stations[slot].last>10000)break;
+            if((int)slot!=(knob[UNCERT][0]?knob[UNCERT][2]:knob[TIMBRE][0])-1 && now-air_stations[slot].last>10000)break;
         if(slot==8)return;
     }else air_count++;
     AirStation *s=&air_stations[slot];
@@ -106,7 +106,7 @@ static void air_freeze(void){
 static void air_step(int on,unsigned now){
     if(!on){
         if(air_started==1)air_stop();
-        air_started=0;air_frozen=0;air_level=air_noise=0;return;
+        rf_source=rf_amount=0;air_started=0;air_frozen=0;air_level=air_noise=0;return;
     }
     if(!air_started){
         air_started=air_hw_start()?1:-1;
@@ -116,7 +116,7 @@ static void air_step(int on,unsigned now){
         if(air_started==1)air_tune(1);
     }
     if(air_started<0)return;
-    int pick=knob[TIMBRE][0]-1;
+    int pick=(knob[UNCERT][0]?knob[UNCERT][2]:knob[TIMBRE][0])-1;
     air_locked=pick>=0 && pick<(int)air_count;
     if(air_locked && air_channel!=air_stations[pick].channel){
         air_channel=air_stations[pick].channel;air_tune(air_channel);
@@ -146,6 +146,13 @@ static void air_step(int on,unsigned now){
         air_history[air_tail][0]=target;air_history[air_tail][1]=noise;
         air_tail=(air_tail+1)%160;if(air_used<160)air_used++;
     }
-    air_filtered+=(target*256-air_filtered)/(1+4*knob[TIMBRE][1]);
+    air_filtered+=(target*256-air_filtered)/(1+4*(knob[UNCERT][0]?knob[UNCERT][3]:knob[TIMBRE][1]));
     air_level=air_filtered/256;air_noise=noise;
+    static int previous;
+    if(!knob[UNCERT][0] || !target)rf_source=0;
+    else if(!knob[UNCERT][1])rf_source=bound(air_level*200/255-100,-100,100);
+    else if(noise>previous)rf_source=knob[UNCERT][1]==1?bound((target+noise)*200/255-100,-100,100):bound(20+noise*2,0,100);
+    else if(knob[UNCERT][1]==2)rf_source-=1+rf_source/(2+knob[UNCERT][3]);
+    if(knob[UNCERT][1]==2 && rf_source<0)rf_source=0;
+    previous=noise;rf_amount=rf_source*knob[ROUTE][1]/100;
 }
