@@ -1003,6 +1003,8 @@ static void effect_display(void) {
   }
   lettering(120,124,page==PLATE?"PLATE":page==AMP?"AMP / CAB":page==WAH?"WAH":page==ENV?"A    D    S    R":page==COMP?"COMPRESSOR":"FUZZ",gold,0);
 }
+static unsigned latch_keys, latch_armed, latch_open;
+static void release_hold(unsigned keys);
 #include "mt_presets.h"
 static unsigned intro_start;
 static int intro;
@@ -1174,9 +1176,38 @@ static void picking_view(void) {
 }
 
 #include "mt_instrument_views.h"
+/* Battery thresholds and icon adapted from GRANA (grana.c). */
+static uint32_t batt_level(void)
+{
+#if defined(GRANA_WEB) || defined(DINGHY_HOST)
+    return 6u; /* Unknown: the simulator has no battery ADC. */
+#else
+    int32_t b = batt_raw;
+    if (batt_usb()) return 5u;
+    if (!b) return 6u;
+    return b >= 591 ? 4u : b >= 561 ? 3u : b >= 531 ? 2u : 1u;
+#endif
+}
+static uint32_t batt_shown(void) { uint32_t l = batt_level(); return l == 1u && (fm1_ms >> 9 & 1u) ? 0u : l; }   /* 0: the blink's off half */
+static int32_t batt_draw(void)               /* on the header's canvas, right-aligned; returns its left edge */
+{
+    uint32_t l = batt_shown(), k;
+    int32_t x = 210, y = 4;
+    uint16_t c = l == 5u ? RGB(80, 220, 110) : l >= 3u ? RGB(80, 210, 100) : l == 2u ? RGB(240, 200, 60) : RGB(255, 70, 60);
+    uint16_t o = l == 5u ? c : RGB(150, 146, 140);
+    cv_rect(x, y, 24, 1, o); cv_rect(x, y + 11, 24, 1, o); cv_rect(x, y, 1, 12, o); cv_rect(x + 23, y, 1, 12, o);
+    cv_rect(x + 24, y + 3, 2, 6, o);         /* the cap */
+    if (l == 5u) {                           /* USB: a bolt */
+        static const int8_t B[9][2] = {{13, 2}, {12, 3}, {11, 4}, {10, 5}, {9, 6}, {13, 5}, {12, 6}, {11, 7}, {10, 8}};
+        for (k = 0; k < 9u; k++) cv_rect(x + B[k][0] - 1, y + B[k][1] + 1, 4, 1, c);
+    } else if(l==6u)cv_rect(x+9,y+5,7,1,o);
+    else
+        for (k = 0; k < l && k < 4u; k++) cv_rect(x + 2 + 5 * (int32_t)k, y + 2, 4, 8, c);
+    return x;
+}
 static void draw(void) {
   if(intro && fm1_ms-intro_start<INTRO_END_MS){boot_draw(fm1_ms-intro_start);return;}intro=0;
-  static const char *const modes[] = {"STOP", "REC", "DUB", "HOLD"};
+  static const char *const modes[] = {"STOP", "REC", "DUB", "PLAY"};
   unsigned t = transport;
   cv_begin(240, 146, 0);
   if(voice_kind()==AIR && (page==HOME || page==TIMBRE || page==ARP))air_display();
@@ -1306,7 +1337,10 @@ static void draw(void) {
   }
   cv_blit(0, 0);
   cv_begin(240, 94, ink);
-  panel_text(knob[SOUND][2]==4?126:112,0,engines[knob[SOUND][2]],gold,knob[SOUND][2]==4?92:58,95);
+  batt_draw();
+  panel_text(98,0,engines[knob[SOUND][2]],gold,64,95);
+  panel_text(184,0,(reverse && t==HOLD)?"REV":modes[t],silver,38,0);
+  if(latch_armed)panel_text(21,13,"HOLD",gold,36,0);
   char slot_id[]={'P','0'+(program+1)/10,'0'+(program+1)%10,0};
   if(naming){
     lettering(120,20,"PRESETS selects destination",silver,ink);
@@ -1318,13 +1352,12 @@ static void draw(void) {
     }
     cv_blit(0,146);return;
   }
-  if(knob[SOUND][2]!=4)lettering(155,0,slot_id,silver,ink);
-  lettering(46,0,page==ART && !knob[SOUND][2]?"SEL TOUCH":page==ARP && !knob[SOUND][2]?"ARP RATE":pages[page],gold,ink);
-  if(t==HOLD) cv_rect(178,0,56,18,gold);
-  lettering(204,0,(reverse && t==HOLD)?"REV":modes[t],t==HOLD?ink:silver,t==HOLD?gold:ink);
-  int width = length ? position * 228u / length : 0;
-  cv_rect(6, 19, 228, 2, metal);
-  cv_rect(6, 19, width, 2, gold);
+  lettering(148,0,slot_id,silver,ink);
+  panel_text(31,0,page==ART && !knob[SOUND][2]?"SEL TOUCH":page==ARP && !knob[SOUND][2]?"ARP RATE":pages[page],gold,60,0);
+  int start=latch_armed?43:6;
+  int width=length?position*(234u-start)/length:0;
+  cv_rect(start,19,234-start,2,metal);
+  cv_rect(start,19,width,2,gold);
   for (int k = 0; k < 4; k++) {
     if ((page == OFF_TAPE || page == LIGHTS || page == HEAD2) && k > 0) break;
     if ((page == SCALE || page == BT || page==ERASE || page==SPEED || (page==TIMBRE && !four_timbre()) || page==MOTION) && k >= 2) break;
@@ -1563,6 +1596,18 @@ static void midi_input(unsigned src,unsigned st,unsigned a,unsigned b) {
     case 91:knob[PLATE][0]=v;break;
   }
 }
+static int latch_notes[27],latch_channels[27];
+static void release_hold(unsigned keys){
+  for(unsigned k=0;k<27;k++)if(latch_keys&(1u<<k)){
+    if((keys&(1u<<k)) && key_notes[k]==latch_notes[k] && key_channels[k]==latch_channels[k])continue;
+    keyboard_out(128+latch_channels[k],latch_notes[k],0);
+    post(EV_OFF,latch_notes[k],0);
+  }
+  latch_keys=latch_armed=latch_open=0;
+}
+static void hold_key(int k){
+  latch_keys|=1u<<k;latch_notes[k]=key_notes[k];latch_channels[k]=key_channels[k];
+}
 static void app_step(void) {
   static unsigned key_prev, last_frame, rec_started;
   static int rec_pending;
@@ -1577,8 +1622,18 @@ static void app_step(void) {
     octave = bound(octave + 1, -2, 3);
   if (edge & (1u << BTN_OCT_DOWN))
     octave = bound(octave - 1, -2, 3);
-  if (edge & (1u << BTN_HOME))
-    page = HOME;
+  static unsigned home_started;
+  static int home_pending;
+  if(edge&(1u<<BTN_HOME)){home_started=fm1_ms;home_pending=1;}
+  if(home_pending && fm1_ms-home_started>=1200){
+    home_pending=0;
+    if(latch_armed)release_hold(key_prev);
+    else{
+      latch_armed=1;latch_open=!key_prev;
+      for(int k=0;k<27;k++)if(key_prev&(1u<<k))hold_key(k);
+    }
+  }
+  if(rel&(1u<<BTN_HOME)){if(home_pending)page=HOME;home_pending=0;}
   if (edge & (1u << BTN_LFO)) { if(page==LFO) vib_on=!vib_on; page=LFO; }
   if (edge & (1u << BTN_EDIT))
     page = knob[SOUND][2]==4 ? TIMBRE : knob[SOUND][2] && page==SOUND ? TIMBRE :
@@ -1646,9 +1701,14 @@ static void app_step(void) {
       if (keys & (1u << k)) {
         key_notes[k] = scale_note(bound(53 + k + octave * 12, 0, 127));
         key_channels[k]=knob[MIDI][0]?knob[MIDI][0]-1:0;
+        if((latch_keys&(1u<<k)) && key_notes[k]==latch_notes[k] && key_channels[k]==latch_channels[k])continue;
+        if(latch_open)hold_key(k);
         keyboard_out(144+key_channels[k],key_notes[k],110);
         post(EV_NOTE, key_notes[k], 110);
       } else {
+        if((latch_keys&(1u<<k)) && key_notes[k]==latch_notes[k] && key_channels[k]==latch_channels[k]){
+          latch_open=0;continue;
+        }
         keyboard_out(128+key_channels[k],key_notes[k],0);
         post(EV_OFF, key_notes[k], 0);
       }
@@ -1663,7 +1723,7 @@ static void app_step(void) {
 #endif
   if(!knob[MIDI][2] || (last_tick && fm1_ms-last_tick>1000)){last_tick=ticks=beat_ms=0;}
   air_step(voice_kind()==AIR,fm1_ms);
-  update_leds(keys);
+  update_leds(keys|latch_keys);
   if(globals_changed && fm1_ms-light_changed>=600u) {
     if(!settings_save(globals,sizeof globals)) globals_changed=0;
     light_changed=fm1_ms;

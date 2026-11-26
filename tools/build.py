@@ -289,18 +289,20 @@ def main():
     name = "virgo.fwsc"
     if a.release:                   # one digit each: the identity has room for two (X.Y; a .Z only in the text)
         m = re.fullmatch(r"(\d)\.(\d|18)(\.\d)?(-[A-Za-z0-9]+)?", a.release)
-        if not m or (len(m[2])>1 and a.release not in ("1.18","1.18-air2","1.18-eno","1.18-eno2","1.18-eno3")):
+        if not m or (len(m[2])>1 and a.release not in ("1.18","1.18-air2","1.18-eno","1.18-eno2","1.18-eno3","1.18-eno4")):
             raise SystemExit(f"--release {a.release}: use 1.18, X.Y, X.Y.Z or X.Y-suffix, one digit each")
         PRODUCT = "FM-1_" + str(840 + 10*int(m[1]) + int(m[2]))
         if a.release=="1.18-air2": PRODUCT="FM-1_870"
         if a.release=="1.18-eno": PRODUCT="FM-1_871"
         if a.release=="1.18-eno2": PRODUCT="FM-1_872"
         if a.release=="1.18-eno3": PRODUCT="FM-1_873"
+        if a.release=="1.18-eno4": PRODUCT="FM-1_874"
         VERSION = m[1] + "." + m[2] + (m[3] or "") + (" BT" if a.bt else "")
         if a.release=="1.18-air2": VERSION="1.18-air2"
         if a.release=="1.18-eno": VERSION="1.18-eno"
         if a.release=="1.18-eno2": VERSION="1.18-eno2"
         if a.release=="1.18-eno3": VERSION="1.18-eno3"
+        if a.release=="1.18-eno4": VERSION="1.18-eno4"
         name = f"mariotronics-{a.release}{'-bluetooth' if a.bt else ''}.fwsc"
     global BT
     BT = a.bt

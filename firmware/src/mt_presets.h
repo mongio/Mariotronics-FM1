@@ -142,6 +142,7 @@ static void apply_patch(const Patch *p) {
 static void switch_engine(int next) {
   int current=knob[SOUND][2];
   if (current==next) return;
+  if(latch_armed)release_hold(fm1_in.notes);
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   unsigned flags=irq_save();
 #endif
@@ -174,6 +175,7 @@ static void switch_engine(int next) {
 }
 
 static void recall_program(int slot) {
+  if(latch_armed)release_hold(fm1_in.notes);
   naming=0;
   Patch p = bank.custom[slot]==1 ? bank.patch[slot] : initial_patch;
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
