@@ -1,5 +1,12 @@
 # Mariotronics ENO Studio Lab
 
+## Lab 6 (1.18-eno6, FM-1_876)
+
+* **Audio from RAM.** The per-sample audio path (voices, effects, tape, plate) and its tables now run from RAM, as in VIRGO. From the flash it shared the XIP cache with the piano recordings, and dense piano polyphony could overrun the audio deadline. At the extremes of the velocity range the piano decodes only the layer it plays. The sound is bit-identical to Lab 5 in FRIPP, ENO, RILEY and RADIGUE.
+* **STOCKHAUSEN in fixed point.** The modal resonator used float arithmetic, which the FM-1 build performs in software (about 60 library calls per voice per sample), and four held notes overran the audio deadline, heard as crackle and distortion. It now uses Q30 integer rotations. Excitation is limited by the energy already in the body, so dense Wi-Fi traffic or a long Ring no longer drives the modes into the output stage. The old instantaneous compressor that intermodulated the modes is removed.
+* **Keyboard HOLD.** Hold HOME for 1 second. The keys held at that moment and every note played afterwards keep sounding until HOME is held again for 1 second. A key still held at release keeps its note until lifted. Notes are latched by pitch, so octave changes are safe.
+* **Arpeggio.** In ENO, RILEY and RADIGUE, adding or lifting a note no longer restarts the pattern. FRIPP is unchanged.
+
 Install the firmware from the offline editor. ENO Piano and Bright play recorded hammer attacks in six registers and two velocity layers. The optional **Install ENO piano sustain bank** button extends those recordings from 1.78 to 4.44 seconds at their original key. Both versions support reverse, the sustain pedal and the existing envelope, soundboard and damper controls. The simulator loads the extended version automatically.
 
 The extension occupies 279,316 bytes of the shared 276 KiB sample area. Installation runs separately after the firmware update. An existing GRANA or VIRGO bank is preserved and ENO uses the internal recordings. An interrupted transfer can be repeated. The complete bank is checked before playback.

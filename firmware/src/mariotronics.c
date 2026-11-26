@@ -6,6 +6,15 @@
  */
 #define APP_NAME "MARIOTRONICS"
 #define CV_MAX (240u * 146u)
+/* The audio path runs from RAM: from the flash it shared the XIP cache with
+   the piano samples and stalled when several voices read them at once. */
+#if defined(GRANA_WEB) || defined(DINGHY_HOST)
+#define AUDIO_FAST
+#define AUDIO_TABLE
+#else
+#define AUDIO_FAST __attribute__((section(".fast_text")))
+#define AUDIO_TABLE __attribute__((section(".fast_rodata")))
+#endif
 #include "mt_art.h"
 #include "platform.c"
 #include "mt_ble.h"
@@ -48,7 +57,7 @@ static const char *const ambient_voices[]={"PIANO","BRIGHT","GLASS","CHOIR","RHO
 static const char *const voices[] = {"SING", "HOLLOW"};
 static const char *const mode_names[] = {"CHROM", "DORIAN", "MAJOR"};
 static const char *const tonic_names[] = {"C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"};
-static int scale_note(int note) {
+static inline __attribute__((always_inline)) int scale_note_now(int note) {
   static const unsigned masks[] = {0xfff, 0x6ad, 0xab5};
   unsigned mask = masks[knob[SCALE][0]];
   int root = knob[SCALE][1];
@@ -60,6 +69,7 @@ static int scale_note(int note) {
   }
   return note;
 }
+static int scale_note(int note) { return scale_note_now(note); }
 static const char *const engines[] = {"FRIPP","ENO","RILEY","RADIGUE","STOCKHAUSEN"};
 static const char *const drones[]={"BEATING","SUB","VEIL","FIFTH"};
 static const char *const patterns[]={"OFF","CLIMB","FOLD","PHASE","ORBIT"};
@@ -68,7 +78,8 @@ static const char *const timbre_labels[][4]={
   {"Tine","Pickup"},{"Bow","Glass"},{"4 FT","2 2/3 FT"},{"Edge","Breath"},
   {"4 FT","Mixture"},{"Bellows","Air"},{"Beat","Color"},{"Beat","Color"},
   {"Beat","Color"},{"Beat","Color"},{"Beat","Color","Drift","Shape"},{"Vowel","Blend","Drift","Air"},{"Noise","Tone","Swell","Drift"},{"Tune","Inertia","Material","Ring"}};
-static int voice_kind(void) { if(knob[SOUND][2]==4)return AIR;if(knob[SOUND][2]==1 && knob[SOUND][0]>=6)return EVENING+knob[SOUND][0]-6;return (knob[SOUND][2]==3 ? BEATING : knob[SOUND][2]==2 ? ORGAN : knob[SOUND][2]==1 ? PIANO : SINGING) + knob[SOUND][0]; }
+static inline __attribute__((always_inline)) int voice_kind_now(void) { if(knob[SOUND][2]==4)return AIR;if(knob[SOUND][2]==1 && knob[SOUND][0]>=6)return EVENING+knob[SOUND][0]-6;return (knob[SOUND][2]==3 ? BEATING : knob[SOUND][2]==2 ? ORGAN : knob[SOUND][2]==1 ? PIANO : SINGING) + knob[SOUND][0]; }
+static int voice_kind(void) { return voice_kind_now(); }
 static int four_timbre(void){int k=voice_kind();return k==PIANO || k==BRIGHT || k>=EVENING;}
 static int page, octave;
 static volatile int vib_on = 1;
@@ -77,11 +88,11 @@ static volatile unsigned transport, position, length = TAPE_RATE * 4, has_loop,
 static volatile int vu_in, vu_out;
 static unsigned valid_samples;
 static unsigned random_state = 14701;
-static int bound(int x, int lo, int hi) {
+static inline __attribute__((always_inline)) int bound(int x, int lo, int hi) {
   return x < lo ? lo : x > hi ? hi : x;
 }
-static int absolute(int x) { return x < 0 ? -x : x; }
-static int rnd(void) {
+static inline __attribute__((always_inline)) int absolute(int x) { return x < 0 ? -x : x; }
+static inline __attribute__((always_inline)) int rnd(void) {
   random_state = random_state * 1664525u + 1013904223u;
   return (int)(random_state >> 16) - 32768;
 }
@@ -102,8 +113,8 @@ static void update_pitch(String *s);
 /* Signed RF modulation, applied to the instrument before the tape send. */
 enum { RF_TIMBRE, RF_COLOR, RF_LEVEL, RF_PITCH };
 static volatile int rf_amount,rf_source;
-static int rf_mod(int dest){return knob[UNCERT][0] && knob[ROUTE][0]==dest?rf_amount:0;}
-static int rf_timbre(int base){return bound(base+rf_mod(RF_TIMBRE)*8/100,0,8);}
+static inline __attribute__((always_inline)) int rf_mod(int dest){return knob[UNCERT][0] && knob[ROUTE][0]==dest?rf_amount:0;}
+static AUDIO_FAST int rf_timbre(int base){return bound(base+rf_mod(RF_TIMBRE)*8/100,0,8);}
 #include "mt_acoustic.h"
 #include "mt_air.h"
 #include "mt_modal.h"
@@ -111,8 +122,8 @@ static unsigned char held_notes[128], held_counts[128];
 static int phrase_enabled;
 static int held_size;
 static unsigned serial;
-static unsigned note_frames(int kind){return kind==GLASS_BELL || kind==TAPE_CHOIR?36015u:(kind==PIANO || kind==BRIGHT?PIANO_FRAMES:43520u);}
-static unsigned timeline_step(int kind,int note){
+static inline __attribute__((always_inline)) unsigned note_frames(int kind){return kind==GLASS_BELL || kind==TAPE_CHOIR?36015u:(kind==PIANO || kind==BRIGHT?PIANO_FRAMES:43520u);}
+static inline __attribute__((always_inline)) unsigned timeline_step(int kind,int note){
   if(kind==GLASS_BELL || kind==TAPE_CHOIR){
     int root=36+8*bound((note-32)/8,0,7);
     return (period256[root]*21845u)/period256[note];
@@ -233,12 +244,12 @@ static void note_off(int note) {
 static int saturate(int x);
 /* Interpolated harmonic excitation supplies the energy of the held lead
  * after the picked waveguide transient has decayed. Phase wraps unsigned. */
-static int sinus(unsigned phase) {
+static inline __attribute__((always_inline)) int sinus(unsigned phase) {
   unsigned index = phase >> 24;
   int a = sine256[index], b = sine256[(index + 1u) & 255u];
   return a + (b - a) * (int)((phase >> 16) & 255u) / 256;
 }
-static int singing_pickup(String *s, int pluck, int drive) {
+static AUDIO_FAST int singing_pickup(String *s, int pluck, int drive) {
   if (s->gate && s->bloom < 24576)
     s->bloom++;
   s->phase += s->increment;
@@ -253,7 +264,7 @@ static int singing_pickup(String *s, int pluck, int drive) {
   s->neck += (clipped - s->neck) / 4;
   return s->neck * 2;
 }
-static void update_pitch(String *s) {
+static AUDIO_FAST void update_pitch(String *s) {
   if (s->glide_at < s->glide_ticks) {
     s->glide_at++;
     int t=s->glide_at*1024/s->glide_ticks;
@@ -278,14 +289,15 @@ static void update_pitch(String *s) {
   s->delay = delay;
   s->increment = (0xffffffffu / ((unsigned)delay + 64u)) * 256u;
 }
-static const uint8_t *piano_packet(unsigned zone,unsigned block){
+static AUDIO_FAST const uint8_t *piano_packet(unsigned zone,unsigned block){
   unsigned base_blocks=PIANO_FRAMES/64;
   if(block<base_blocks)return piano_bank+35*(zone*base_blocks+block);
   return eno_flash+16+35*(zone*(TAIL_FRAMES/64)+block-base_blocks);
 }
-static void piano_block(String *s,unsigned block){
+static AUDIO_FAST void piano_block(String *s,unsigned block){
   int weight=bound((s->strength-35)*3+(s->kind==BRIGHT?65:0),0,256);
-  for(int layer=0;layer<2;layer++){
+  /* At the ends of the velocity range one layer is the whole result: decode only it. */
+  for(int layer=weight==256;layer<(weight?2:1);layer++){
     unsigned zone=2*s->sample_root+layer;
     const uint8_t *p=piano_packet(zone,block);
     int pred=(int16_t)(p[0]+256*p[1]),index=p[2];
@@ -301,18 +313,20 @@ static void piano_block(String *s,unsigned block){
         pred=bound(pred+(code&8?-d:d),-32768,32767);
         index=bound(index+ima_adjust[code&7],0,88);
       }
-      if(!layer)piano_strings[s-strings].decoded[i]=pred;
+      if(!layer || weight==256)piano_strings[s-strings].decoded[i]=pred;
       else piano_strings[s-strings].decoded[i]+=(pred-piano_strings[s-strings].decoded[i])*weight/256;
     }
   }
   s->at=(int)block;
 }
-static int piano_tick(String *s) {
+static unsigned piano_rate(unsigned long long scaled,unsigned delay){return (unsigned)(scaled/delay);}
+static unsigned (*volatile piano_rate_p)(unsigned long long,unsigned) = piano_rate;
+static AUDIO_FAST int piano_tick(String *s) {
   if (!(s->pitch_clock++ & 15)) {
     update_pitch(s);
     unsigned read_delay=s->delay+64;
     s->sample_step=(timeline_step(s->kind,s->note)/32)*(period256[s->note]+64u)/read_delay*32;
-    if(s->kind<=BRIGHT) s->sample_step=(unsigned)((uint64_t)11889*(period256[36+9*s->sample_root]+64u)/read_delay);
+    if(s->kind<=BRIGHT) s->sample_step=piano_rate_p(11889ull*(period256[36+9*s->sample_root]+64u),read_delay);
     if(knob[SOUND][2]==1) {
       s->piano_tone=bound(16+knob[NOTE_FX][1]*7+(knob[TIMBRE][0]-4)*12+s->strength/2+(s->kind==BRIGHT?45:0),16,245);
       s->damper=knob[NOTE_FX][2];
@@ -379,7 +393,7 @@ static int piano_tick(String *s) {
   return (s->hammer_filter*s->strength/127)*amp/256;
 }
 
-static int envelope_tick(String *s) {
+static AUDIO_FAST int envelope_tick(String *s) {
   if (!s->gate && !(pedal && (s->kind==PIANO || s->kind==BRIGHT))) {
     if (!s->release_step) s->release_step=1+s->env_q8/s->release_length;
     s->env_q8-=s->release_step;
@@ -394,7 +408,7 @@ static int envelope_tick(String *s) {
   return s->level;
 }
 static const char *const motion_titles[]={"SOUNDBOARD","SOUNDBOARD","SHIMMER","CHORUS","TREMOLO","SHIMMER","ROTARY","AIR PULSE","ROTARY","BELLOWS","SLOW FADE","SLOW FADE","SLOW FADE","SLOW FADE","SHIMMER","CHORUS","AIR PULSE","AIR FLOW"};
-static int motion_sample(String *s,int sample){
+static AUDIO_FAST int motion_sample(String *s,int sample){
   int depth=knob[MOTION][1];
   if(!depth)return sample;
   int kind=s->kind, rate=knob[MOTION][0];
@@ -407,7 +421,7 @@ static int motion_sample(String *s,int sample){
     return sample+(s->motion_filter-sample)*((128+wave)*depth)/2048;
   return sample-sample*((128-wave)*depth)/2560;
 }
-static int string_tick(String *s) {
+static AUDIO_FAST int string_tick(String *s) {
   if (!s->active)
     return 0;
   int level=envelope_tick(s);
@@ -482,7 +496,7 @@ static int16_t play_history[128];
 static unsigned play_head, play_valid, wow_phase, flutter_phase;
 static int wow_depth, flutter_depth;
 
-static int read_transport(int sample, int wow, int flutter) {
+static AUDIO_FAST int read_transport(int sample, int wow, int flutter) {
   play_history[play_head]=sample;
   if (play_valid<128) play_valid++;
   wow_phase+=201600u;       /* 0.69 Hz at tape rate */
@@ -501,7 +515,7 @@ static int read_transport(int sample, int wow, int flutter) {
   play_head=(play_head+1)&127u;
   return sample;
 }
-static int tape_record_level(int sample,int saturation) {
+static AUDIO_FAST int tape_record_level(int sample,int saturation) {
   int knee=30000-saturation*250;
   int magnitude=absolute(sample);
   if(magnitude<=knee) return sample;
@@ -516,7 +530,7 @@ static void reset_head(void) {
   head_previous = head_filtered = 0;
 }
 
-static void advance_head(int recorded) {
+static AUDIO_FAST void advance_head(int recorded) {
   int sample = head_count == HEAD_SAMPLES ? head_history[head_index] : 0;
   if (head_count < HEAD_SAMPLES) head_count++;
   head_history[head_index] = recorded;
@@ -538,7 +552,7 @@ static void finish_range(void) {
   }
   erased_count=0;
 }
-static int moving_head(int normal) {
+static AUDIO_FAST int moving_head(int normal) {
   if(slip_offset!=slip_target){
     slip_offset+=bound(slip_target-slip_offset,-8,8);
     slip_mix=bound(slip_mix+4,0,256);
@@ -597,7 +611,7 @@ static void erase_loop(void) {
   position = 0;
   next_return = prev_return = tape_lp = dec_samples = dec_sum = dec_n = 0;
 }
-static int saturate(int x) {
+static inline __attribute__((always_inline)) int saturate(int x) {
   int a = absolute(x);
   int y = 8192 - 67108864 / (8192 + a);
   return x < 0 ? -y : y;
@@ -607,7 +621,7 @@ static int wah_low,wah_band,wah_tone,fuzz_tone,amp_bass,amp_cab;
 static int comp_envelope,comp_gain=4096;
 static unsigned comp_clock;
 #include "mt_tone_fx.h"
-static int instrument_fx(int sample) {
+static AUDIO_FAST int instrument_fx(int sample) {
   int peak=absolute(sample);
   if(peak>=comp_envelope) comp_envelope=peak;
   else if(!(comp_clock&15u)) comp_envelope-=1+(comp_envelope-peak)/(14+knob[COMP][2]*3);
@@ -668,20 +682,23 @@ static void phrase_event(int note,int velocity) {
   }
   if(!phrase_enabled){
     if(velocity)note_on(note,velocity);else note_off(note);
-  } else if (!phrase_size || !previous_size || knob[SOUND][2]!=0) {
+  } else if (!phrase_size || !previous_size) {   /* adding or lifting a note keeps the arpeggio's place */
     phrase_reset();
     if(phrase_size)phrase_start();
   }
 }
 static volatile unsigned pick_display, pick_time;
 static volatile int pick_struck;
-static void phrase_tick(void) {
+/* RAM code reaches the flash only through pointers: a direct call is out of range. */
+static void (*volatile strike_p)(int, int, int, int) = strike;
+static void (*volatile glide_to_p)(String *, int) = glide_to;
+static AUDIO_FAST void phrase_tick(void) {
   if(!phrase_size)return;
   if(phrase_wait){phrase_wait--;return;}
   if(phrase_gain<1048576)phrase_gain=bound(phrase_gain+phrase_rise_step,0,1048576);
   if(!phrase_left){
     int root=phrase_keys[0];
-    int n=phrase_size==1 ? ((phrase_step&1)?scale_note(bound(root+(knob[SOUND][2]==0?knob[PICK_ART][3]:7),0,127)):root)
+    int n=phrase_size==1 ? ((phrase_step&1)?scale_note_now(bound(root+(knob[SOUND][2]==0?knob[PICK_ART][3]:7),0,127)):root)
                          : phrase_keys[phrase_size-2+(phrase_step&1)];
     int velocity_note=phrase_size==1?root:n;
     if(knob[SOUND][2]){
@@ -689,10 +706,10 @@ static void phrase_tick(void) {
       static const int intervals[][8]={{0,7,14,16,19,24,26,31},{0,2,5,7,9,12,14,17},{0,5,7,12,17,19,24,31}};
       int index=order[bound(knob[ARP][0]-1,0,3)][phrase_step];
       velocity_note=phrase_keys[index%phrase_size];
-      n=scale_note(bound(phrase_size==1?root+intervals[bound(knob[SOUND][2]-1,0,2)][index]:velocity_note,0,127));
+      n=scale_note_now(bound(phrase_size==1?root+intervals[bound(knob[SOUND][2]-1,0,2)][index]:velocity_note,0,127));
     }
     int left=phrase_size==1?root:phrase_keys[phrase_size-2];
-    int right=phrase_size==1?scale_note(bound(root+knob[PICK_ART][3],0,127)):phrase_keys[phrase_size-1];
+    int right=phrase_size==1?scale_note_now(bound(root+knob[PICK_ART][3],0,127)):phrase_keys[phrase_size-1];
     pick_display=left | (right<<8) | ((phrase_step&1)<<16);
     pick_time=fm1_ms;
     pick_struck=!(knob[PICK_ART][2] && (phrase_step&1) && strings[0].gate);
@@ -702,9 +719,9 @@ static void phrase_tick(void) {
     phrase_left=44100/knob[ARP][1];
     if(knob[SOUND][2]==1 && knob[ARP][0]>=3)phrase_left+=phrase_left*((phrase_step&1)?1:-1)/5;
     if(tied && (phrase_step&1) && strings[0].gate){
-      glide_to(&strings[0],n);
+      glide_to_p(&strings[0],n);
       strings[0].glide_ticks=bound(strings[0].glide_ticks,1,phrase_left/48);
-    } else strike(0,n,v?v:1,voice_kind());
+    } else strike_p(0,n,v?v:1,voice_kind_now());
     /* A picked transient must fit inside a fast gate, even with long manual swells. */
     if(strings[0].attack<8388352/(44*6))strings[0].attack=8388352/(44*6);
     if(strings[0].release_length>1323)strings[0].release_length=1323;
@@ -722,39 +739,22 @@ static volatile int meter_level[2];
 static volatile unsigned meter_peak_time[2];
 static volatile unsigned meter_peak_valid;
 
-static volatile unsigned audio_ready;
-static void app_audio(int32_t *out, uint32_t n) {
-  if (!audio_ready) return; /* Platform supplies a cleared buffer during startup. */
-  apply_events();
-  if(transport==STOP){slip_offset=slip_target=slip_mix=0;range_down=0;}
-  if(!range_down && erased_count)finish_range();
-  if (!loop_mode) {
-    unsigned requested = beat_length();
-    if (requested != length) {
-      if(transport!=STOP && !knob[MIDI][2]){
-        int delta=(int)requested-(int)length;
-        slip_target=bound(slip_target-delta*4,-65536,65536);
-      }
-      length = requested;
-      if (position >= length) position %= length;
-      /* Keep the rest of the reel available when a longer setting returns. */
-    }
-  }
-  unsigned layer_length = length * 731u / 1000u;
-  int layer_target = knob[SOUND][2]==1 && knob[HEAD2][0] ? 256 : 0;
-  ToneControls tone=tone_controls();
-  tone_prepare(tone);
-  int peak_in = 0, peak_out = 0;
-  int decay=100+knob[PLATE][1]*148/100;
-  int damping=235-knob[PLATE][2]*215/100;
-  int predelay=knob[PLATE][3]*2205/100, wet=knob[PLATE][0];
-  int hf_coefficient=256-2*knob[CHARACTER][0], saturation=knob[CHARACTER][1];
-  int wow=knob[CHARACTER][2], flutter=knob[CHARACTER][3];
+typedef struct {
+  unsigned layer_length, sums[2], peaks[2];
+  int layer_target, mix, decay, damping, predelay, wet, hf_coefficient, saturation, wow, flutter;
+  int monitor_voice, monitor_mix, color_mod, level_mod, tape_rate, peak_in, peak_out;
+} AudioBlock;
+/* The per-sample work: voices, instrument effects, tape and plate. It runs from RAM. */
+static AUDIO_FAST void audio_loop(int32_t *out, uint32_t n, AudioBlock *b) {
+  unsigned layer_length=b->layer_length; int layer_target=b->layer_target;
+  int decay=b->decay, damping=b->damping, predelay=b->predelay, wet=b->wet;
+  int hf_coefficient=b->hf_coefficient, saturation=b->saturation, wow=b->wow, flutter=b->flutter;
+  int monitor_voice=b->monitor_voice, monitor_mix=b->monitor_mix;
+  int color_mod=b->color_mod, level_mod=b->level_mod, tape_rate=b->tape_rate;
+  int peak_in=0, peak_out=0;
+  unsigned sums0=0, sums1=0, peaks0=0, peaks1=0;
   unsigned scope_write=scope_head;
-  int monitor_voice=page==SOUND, monitor_mix=page==CHARACTER;
-  int color_mod=rf_mod(RF_COLOR),level_mod=rf_mod(RF_LEVEL);
-  int tape_rate=speed_q8[bound(speed_index(),0,96)];
-  unsigned sums[2]={0,0}, peaks[2]={0,0};
+  struct { int mix; } tone = { b->mix };
   for (unsigned i = 0; i < n; i++) {
     if(phrase_enabled)phrase_tick();
     int dry=0, bridge=0;
@@ -764,7 +764,7 @@ static void app_audio(int32_t *out, uint32_t n) {
     }
     int body=board_tick(bridge,knob[TIMBRE][3]);dry+=body;
     if(monitor_voice)scope_ring[scope_write++ & 1023]=bound(dry,-32767,32767);
-    int shape = voice_kind(), drive = knob[SOUND][1];
+    int shape = voice_kind_now(), drive = knob[SOUND][1];
     int amp = shape >= SINGING ? dry : saturate(dry * (shape == 0 ? 1 + drive / 35 : 4 + drive / 9)) * 2;
     amp_lp += (amp - amp_lp) * (shape >= SINGING ? 2 : shape == 3 ? 5 : 3) / 8;
     int colored=amp_lp;
@@ -851,11 +851,51 @@ static void app_audio(int32_t *out, uint32_t n) {
 #elif !defined(DINGHY_HOST)
       v=v*(unsigned)master_q12>>12;
 #endif
-      sums[ch]+=v;
-      if(v>peaks[ch])peaks[ch]=v;
+      if(ch){sums1+=v;if(v>peaks1)peaks1=v;}else{sums0+=v;if(v>peaks0)peaks0=v;}
     }
   }
   scope_head=scope_write;
+  b->peak_in=peak_in; b->peak_out=peak_out;
+  b->sums[0]=sums0; b->sums[1]=sums1; b->peaks[0]=peaks0; b->peaks[1]=peaks1;
+}
+static void (*volatile audio_loop_p)(int32_t *, uint32_t, AudioBlock *) = audio_loop;
+static volatile unsigned audio_ready;
+static void app_audio(int32_t *out, uint32_t n) {
+  if (!audio_ready) return; /* Platform supplies a cleared buffer during startup. */
+  apply_events();
+  if(transport==STOP){slip_offset=slip_target=slip_mix=0;range_down=0;}
+  if(!range_down && erased_count)finish_range();
+  if (!loop_mode) {
+    unsigned requested = beat_length();
+    if (requested != length) {
+      if(transport!=STOP && !knob[MIDI][2]){
+        int delta=(int)requested-(int)length;
+        slip_target=bound(slip_target-delta*4,-65536,65536);
+      }
+      length = requested;
+      if (position >= length) position %= length;
+      /* Keep the rest of the reel available when a longer setting returns. */
+    }
+  }
+  unsigned layer_length = length * 731u / 1000u;
+  int layer_target = knob[SOUND][2]==1 && knob[HEAD2][0] ? 256 : 0;
+  ToneControls tone=tone_controls();
+  tone_prepare(tone);
+  AudioBlock b;
+  b.layer_length=layer_length; b.layer_target=layer_target; b.mix=tone.mix;
+  b.decay=100+knob[PLATE][1]*148/100;
+  b.damping=235-knob[PLATE][2]*215/100;
+  b.predelay=knob[PLATE][3]*2205/100; b.wet=knob[PLATE][0];
+  b.hf_coefficient=256-2*knob[CHARACTER][0]; b.saturation=knob[CHARACTER][1];
+  b.wow=knob[CHARACTER][2]; b.flutter=knob[CHARACTER][3];
+  b.monitor_voice=page==SOUND; b.monitor_mix=page==CHARACTER;
+  b.color_mod=rf_mod(RF_COLOR); b.level_mod=rf_mod(RF_LEVEL);
+  b.tape_rate=speed_q8[bound(speed_index(),0,96)];
+  b.peak_in=b.peak_out=0; b.sums[0]=b.sums[1]=b.peaks[0]=b.peaks[1]=0;
+  audio_loop_p(out,n,&b);
+  int peak_in=b.peak_in, peak_out=b.peak_out, monitor_mix=b.monitor_mix;
+  unsigned *sums=b.sums, *peaks=b.peaks;
+
   if(monitor_mix && n)for(int ch=0;ch<2;ch++){
     int mean=sums[ch]/n;
     meter_level[ch]+=(mean-meter_level[ch])*(int)n/(int)(4410+n);
@@ -1025,7 +1065,7 @@ static void effect_display(void) {
   }
   lettering(120,124,page==PLATE?"PLATE":page==AMP?"AMP / CAB":page==WAH?"WAH":page==ENV?"A    D    S    R":page==COMP?"COMPRESSOR":"FUZZ",gold,0);
 }
-static unsigned latch_keys, latch_armed, latch_open;
+static unsigned latch_keys, latch_armed;
 static void release_hold(unsigned keys);
 #include "mt_presets.h"
 static unsigned intro_start;
@@ -1625,17 +1665,50 @@ static void midi_input(unsigned src,unsigned st,unsigned a,unsigned b) {
     case 91:knob[PLATE][0]=v;break;
   }
 }
-static int latch_notes[27],latch_channels[27];
-static void release_hold(unsigned keys){
-  for(unsigned k=0;k<27;k++)if(latch_keys&(1u<<k)){
-    if((keys&(1u<<k)) && key_notes[k]==latch_notes[k] && key_channels[k]==latch_channels[k])continue;
-    keyboard_out(128+latch_channels[k],latch_notes[k],0);
-    post(EV_OFF,latch_notes[k],0);
-  }
-  latch_keys=latch_armed=latch_open=0;
+/* Keyboard HOLD. A 1 s press on HOME arms it: the keys down at that moment and
+   every note played afterwards keep sounding until HOME is held again.
+   Notes are latched by pitch, so an octave change cannot strand one. */
+enum { LATCH_MAX = 32 };
+static uint8_t latch_note[LATCH_MAX], latch_channel[LATCH_MAX];
+static unsigned latch_count, key_latched;
+static int latch_find(int note,int channel){
+  for(unsigned i=0;i<latch_count;i++)if(latch_note[i]==note && latch_channel[i]==channel)return (int)i;
+  return -1;
 }
-static void hold_key(int k){
-  latch_keys|=1u<<k;latch_notes[k]=key_notes[k];latch_channels[k]=key_channels[k];
+static void latch_off(unsigned i){
+  keyboard_out(128+latch_channel[i],latch_note[i],0);
+  post(EV_OFF,latch_note[i],0);
+}
+static void latch_add(int note,int channel){
+  if(latch_find(note,channel)>=0)return;
+  if(latch_count==LATCH_MAX){           /* full: the oldest held note makes room */
+    latch_off(0);
+    for(unsigned i=1;i<LATCH_MAX;i++){latch_note[i-1]=latch_note[i];latch_channel[i-1]=latch_channel[i];}
+    latch_count--;
+  }
+  latch_note[latch_count]=(uint8_t)note;latch_channel[latch_count]=(uint8_t)channel;latch_count++;
+}
+static void release_hold(unsigned keys){
+  for(unsigned i=0;i<latch_count;i++){
+    int still=0;                        /* a key still down keeps its own note */
+    for(unsigned k=0;k<27;k++)
+      if((keys&(1u<<k)) && key_notes[k]==latch_note[i] && key_channels[k]==latch_channel[i])still=1;
+    if(!still)latch_off(i);
+  }
+  latch_count=0;key_latched=0;latch_armed=0;latch_keys=0;
+}
+static void arm_hold(unsigned keys){
+  latch_armed=1;latch_count=0;key_latched=0;
+  for(unsigned k=0;k<27;k++)if(keys&(1u<<k)){latch_add(key_notes[k],key_channels[k]);key_latched|=1u<<k;}
+}
+static unsigned latched_keys(void){       /* keys whose current pitch is held, for the LEDs */
+  unsigned bits=0;
+  if(!latch_count)return 0;
+  for(int k=0;k<27;k++){
+    int note=scale_note(bound(53+k+octave*12,0,127));
+    if(latch_find(note,knob[MIDI][0]?knob[MIDI][0]-1:0)>=0)bits|=1u<<k;
+  }
+  return bits;
 }
 static void app_step(void) {
   static unsigned key_prev, last_frame, rec_started;
@@ -1654,13 +1727,10 @@ static void app_step(void) {
   static unsigned home_started;
   static int home_pending;
   if(edge&(1u<<BTN_HOME)){home_started=fm1_ms;home_pending=1;}
-  if(home_pending && fm1_ms-home_started>=1200){
+  if(home_pending && fm1_ms-home_started>=1000){
     home_pending=0;
     if(latch_armed)release_hold(key_prev);
-    else{
-      latch_armed=1;latch_open=!key_prev;
-      for(int k=0;k<27;k++)if(key_prev&(1u<<k))hold_key(k);
-    }
+    else arm_hold(key_prev);
   }
   if(rel&(1u<<BTN_HOME)){if(home_pending)page=HOME;home_pending=0;}
   if (edge & (1u << BTN_LFO)) { page=page==LFO?UNCERT:page==UNCERT?ROUTE:LFO; }
@@ -1730,14 +1800,15 @@ static void app_step(void) {
       if (keys & (1u << k)) {
         key_notes[k] = scale_note(bound(53 + k + octave * 12, 0, 127));
         key_channels[k]=knob[MIDI][0]?knob[MIDI][0]-1:0;
-        if((latch_keys&(1u<<k)) && key_notes[k]==latch_notes[k] && key_channels[k]==latch_channels[k])continue;
-        if(latch_open)hold_key(k);
+        if(latch_armed){
+          key_latched|=1u<<k;
+          if(latch_find(key_notes[k],key_channels[k])>=0)continue;   /* already sounding */
+          latch_add(key_notes[k],key_channels[k]);
+        }
         keyboard_out(144+key_channels[k],key_notes[k],110);
         post(EV_NOTE, key_notes[k], 110);
       } else {
-        if((latch_keys&(1u<<k)) && key_notes[k]==latch_notes[k] && key_channels[k]==latch_channels[k]){
-          latch_open=0;continue;
-        }
+        if(key_latched&(1u<<k)){key_latched&=~(1u<<k);continue;}
         keyboard_out(128+key_channels[k],key_notes[k],0);
         post(EV_OFF, key_notes[k], 0);
       }
@@ -1752,6 +1823,7 @@ static void app_step(void) {
 #endif
   if(!knob[MIDI][2] || (last_tick && fm1_ms-last_tick>1000)){last_tick=ticks=beat_ms=0;}
   air_step(voice_kind()==AIR || knob[UNCERT][0],fm1_ms);
+  latch_keys=latched_keys();
   update_leds(keys|latch_keys);
   if(globals_changed && fm1_ms-light_changed>=600u) {
     if(!settings_save(globals,sizeof globals)) globals_changed=0;
@@ -1787,6 +1859,7 @@ WEB_EXPORT("rf_meter") int web_rf_meter(void){return air_level;}
 WEB_EXPORT("rf_count") int web_rf_count(void){return air_count;}
 WEB_EXPORT("rf_frozen") int web_rf_frozen(void){return air_frozen;}
 WEB_EXPORT("voice") int web_voice(void){return voice_kind();}
+WEB_EXPORT("arp") int web_arp(void){return phrase_step | phrase_size<<8 | phrase_left<<16;}
 WEB_EXPORT("page") int web_page(void){return page;}
 WEB_EXPORT("idle_preview") void web_idle_preview(void){intro=0;draw();}
 WEB_EXPORT("param") int web_param(unsigned k) {

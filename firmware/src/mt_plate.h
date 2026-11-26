@@ -10,18 +10,18 @@ static void plate_init(void) {
     offset += lengths[i];
   }
 }
-static int tap(int id, int age) {
+static inline __attribute__((always_inline)) int tap(int id, int age) {
   PlateLine *p=&lines[id];
   int pos=p->head-age;
   if(pos<0) pos+=p->size;
   return plate_memory[p->offset+pos];
 }
-static void push(int id,int v) {
+static inline __attribute__((always_inline)) void push(int id,int v) {
   PlateLine *p=&lines[id];
   plate_memory[p->offset+p->head]=(int16_t)bound(v,-32760,32760);
   if(++p->head==p->size) p->head=0;
 }
-static int diffuse(int id,int v,int gain,int delay_q8) {
+static AUDIO_FAST int diffuse(int id,int v,int gain,int delay_q8) {
   int delay=delay_q8>>8, frac=delay_q8&255;
   int old=tap(id,delay);
   if(frac) old+=(tap(id,delay+1)-old)*frac/256;
@@ -29,14 +29,14 @@ static int diffuse(int id,int v,int gain,int delay_q8) {
   push(id,v+out*gain/256);
   return out;
 }
-static int delay_line(int id,int v) {
+static AUDIO_FAST int delay_line(int id,int v) {
   int old=tap(id,lines[id].size);
   push(id,v);
   return old;
 }
 static int tank_end[2], tank_lp[2], wet_l,wet_r,prev_l,prev_r,plate_half,plate_input;
 static unsigned plate_phase;
-static void plate_tick(int sample,int decay,int damp,int pre) {
+static AUDIO_FAST void plate_tick(int sample,int decay,int damp,int pre) {
   if(pre) {
     int delayed=tap(12,pre);
     push(12,sample);

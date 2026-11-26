@@ -60,8 +60,8 @@ assert len(tails)<=0x45000
 fingerprint=2166136261
 for value in tails: fingerprint=((fingerprint^value)*16777619)&0xffffffff
 
-def table(f,typ,name,values):
-    f.write(f'static const {typ} {name}[] = {{\n')
+def table(f,typ,name,values,attr=''):
+    f.write(f'static const {typ} {name}[]{attr} = {{\n')
     for i in range(0,len(values),32):
         f.write(','.join(map(str,values[i:i+32]))+',\n')
     f.write('};\n')
@@ -70,6 +70,6 @@ with (Path(__file__).resolve().parents[1]/'firmware/gen/mt_piano.h').open('w') a
     f.write(f'#define PIANO_FRAMES {frames}u\n')
     f.write(f'#define TAIL_FRAMES {tail_frames}u\n#define TAIL_BYTES {len(tails)}u\n#define TAIL_HASH {fingerprint}u\n')
     table(f,'uint8_t','piano_bank',bank)
-    table(f,'int16_t','ima_step',steps)
-    table(f,'int8_t','ima_adjust',adjust)
+    table(f,'int16_t','ima_step',steps,' AUDIO_TABLE')
+    table(f,'int8_t','ima_adjust',adjust,' AUDIO_TABLE')
     table(f,'uint32_t','piano_step',[round(65536*rate/44100*2**((n-min(roots,key=lambda r:abs(n-r)))/12)) for n in range(128)])

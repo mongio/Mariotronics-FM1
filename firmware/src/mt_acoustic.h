@@ -7,7 +7,7 @@ typedef struct {
 } PianoStrings;
 static PianoStrings piano_strings[4] POOLMEM;
 static int pedal;
-static int piano_bridge(String *s,int hammer) {
+static AUDIO_FAST int piano_bridge(String *s,int hammer) {
     PianoStrings *p=&piano_strings[s-strings];
     int sum=0, loss=s->gate || pedal ? 15 : 410+180*knob[TIMBRE][2];
     for(int i=0;i<2;i++){
@@ -28,7 +28,7 @@ static int piano_bridge(String *s,int hammer) {
 }
 /* A common bridge excites short, lossy soundboard modes. With the sustain
  * pedal down, the extended feedback also models the open string bed. */
-static int board_tick(int excitation,int resonance){
+static AUDIO_FAST int board_tick(int excitation,int resonance){
     static unsigned remaining;
     if(excitation)remaining=88200;
     else if(!remaining)return 0;
@@ -55,7 +55,7 @@ static int board_tick(int excitation,int resonance){
     index++;
     return wet*(resonance+1)/24;
 }
-static int pad_tick(String *s){
+static AUDIO_FAST int pad_tick(String *s){
     if(!(s->pitch_clock++&15))update_pitch(s);
     int a=rf_timbre(knob[TIMBRE][0]),b=knob[TIMBRE][1],c=knob[TIMBRE][2],d=knob[TIMBRE][3];
     s->phase+=s->increment;

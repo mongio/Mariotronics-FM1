@@ -83,7 +83,12 @@ static void air_poll(unsigned now){
     }
 }
 #else
-/* Explicit simulator fixture. The browser cannot read the FM-1 antenna. */
+/* Explicit simulator fixture. The browser cannot read the FM-1 antenna.
+   Tests can make it louder and busier, like a home router next to the FM-1. */
+static int air_fixture_dbm=-67,air_fixture_frames=1;
+#ifdef GRANA_WEB
+WEB_EXPORT("rf_fixture") void web_rf_fixture(int dbm,int frames){air_fixture_dbm=dbm;air_fixture_frames=frames<1?1:frames;}
+#endif
 static int air_hw_start(void){return 1;}
 static void air_stop(void){}
 static void air_tune(unsigned ch){(void)ch;}
@@ -95,7 +100,8 @@ static void air_poll(unsigned now){
     uint8_t beacon[42]={0x80};
     beacon[10]=air_channel;beacon[37]=4;
     beacon[38]='D';beacon[39]='E';beacon[40]='M';beacon[41]='O';
-    air_receive(beacon,sizeof beacon,-67+sinus(now*720000u+air_channel*30000000u)/8,air_channel,now);
+    for(int i=0;i<air_fixture_frames;i++)
+        air_receive(beacon,sizeof beacon,air_fixture_dbm+sinus(now*720000u+air_channel*30000000u+i*9000000u)/8,air_channel,now);
 }
 #endif
 static void air_freeze(void){

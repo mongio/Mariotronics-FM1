@@ -21,6 +21,13 @@ void *memset(void *d, int c, unsigned long n)
     while (n--) *p++ = (unsigned char)c;
     return d;
 }
+int memcmp(const void *a, const void *b, unsigned long n)
+{
+    const unsigned char *p = a, *q = b;
+    for (; n; n--, p++, q++)
+        if (*p != *q) return *p - *q;
+    return 0;
+}
 void *memcpy(void *d, const void *s, unsigned long n)
 {
     unsigned char *p = d;

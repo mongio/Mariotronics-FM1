@@ -50,7 +50,7 @@ static void tone_prepare(ToneControls t) {
   }
   tone_active=mask;
 }
-static int tone_process(int x,int mix) {
+static AUDIO_FAST int tone_process(int x,int mix) {
   if(!tone_active) return x;
   for(int i=0;i<4;i++) if(tone_active&(1u<<i)) {
     ToneSection *s=&tone_sections[i];
