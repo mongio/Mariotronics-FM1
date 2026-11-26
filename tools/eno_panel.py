@@ -29,16 +29,24 @@ for a in np.linspace(-np.pi*.75,np.pi*.75,9):
 im=Image.fromarray(rgb.astype('uint8')).resize((size,size),Image.Resampling.LANCZOS)
 a=np.array(im).astype(int)
 pixels=((a[:,:,0]>>3)<<11)|((a[:,:,1]>>2)<<5)|(a[:,:,2]>>3)
-font=ImageFont.truetype('/usr/share/fonts/truetype/open-sans/OpenSans-Semibold.ttf',13*scale)
-alpha=[];advance=[]
-for i in range(32,127):
-    ch=chr(i)
-    cell=Image.new('L',(16*scale,18*scale))
-    ImageDraw.Draw(cell).text((0,13*scale),ch,font=font,fill=255,anchor='ls')
-    alpha.extend((np.asarray(cell.resize((16,18),Image.Resampling.LANCZOS)).astype(int).ravel()+8)//17)
-    advance.append(max(3,round(font.getlength(ch)/scale)))
+# Pack each glyph at its own advance. Both faces then fit in the app region.
+tables=[('uint16_t','knob_cap',pixels.ravel())]
+alpha=[];widths=[];offsets=[]
+for path,height,baseline in [
+    ('/usr/share/fonts/truetype/open-sans/OpenSans-Regular.ttf',13,14),
+    ('/usr/share/fonts/truetype/dejavu/DejaVuSerifCondensed.ttf',16,14)]:
+    font=ImageFont.truetype(path,height*scale)
+    for i in range(32,127):
+        ch=chr(i)
+        width=max(3,round(font.getlength(ch)/scale))
+        cell=Image.new('L',(width*scale,18*scale))
+        ImageDraw.Draw(cell).text((0,baseline*scale),ch,font=font,fill=255,anchor='ls')
+        raw=(np.asarray(cell.resize((width,18),Image.Resampling.LANCZOS)).astype(int).ravel()+8)//17
+        offsets.append(len(alpha));widths.append(width)
+        alpha.extend(16*raw[::2]+raw[1::2])
+tables.extend([('uint8_t','panel_adv',widths),('uint16_t','panel_off',offsets),('uint8_t','panel_alpha',alpha)])
 with (root/'firmware/gen/eno_panel.h').open('w') as out:
-    for typ,name,data in [('uint16_t','knob_cap',pixels.ravel()),('uint8_t','panel_adv',advance),('uint8_t','panel_alpha',[16*a+b for a,b in zip(alpha[::2],alpha[1::2])])]:
+    for typ,name,data in tables:
         out.write(f'static const {typ} {name}[]={{\n')
         for i in range(0,len(data),32):out.write(','.join(map(str,data[i:i+32]))+',\n')
         out.write('};\n')

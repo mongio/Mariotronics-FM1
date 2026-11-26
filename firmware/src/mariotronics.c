@@ -33,9 +33,9 @@ enum { STOP, RECORD, DUB, HOLD };
 enum { SINGING = 4, HOLLOW = 5, PIANO = 6, BRIGHT, GLASS_BELL, TAPE_CHOIR, RHODES, BOWED, ORGAN, REED, REED_ORGAN, HARMONIUM, BEATING, SUB_DRONE, VEIL, FIFTH, EVENING, DUSK, TIDAL, AIR };
 enum { HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, MIDI, BT, ARP, OFF_TAPE, LIGHTS, CHARACTER, EQ, FILTER, HEAD2, PICK_ART, ERASE, SPEED, TIMBRE, NOTE_FX, MOTION, PAGE_COUNT };
 static const char *const pages[] = {"TAPE", "INSTRUMENT", "PHRASING", "FUZZ", "SCALES", "WAH", "AMP", "PLATE", "ENV","COMP","LFO","MIDI","BLE MIDI","ARP","OFF-TAPE","LIGHTS","TAPE CHAR","EQ","FILTER","HEAD 2","ARP PICK","ERASE","SPEED","TIMBRE","NOTE FX","MOTION"};
-static const char *const names[][4] = {{"DELAY", "FDBK", "SEND", "RETURN"},
-                                       {"VOICE", "DRIVE", "ENGINE", "MODE"},
-                                       {"GLISS", "MS", "CENT", "HZ"}, {"DRIVE","TONE","BIAS","MIX"}, {"MODE","ROOT"}, {"SWEEP","RES","TONE","MIX"}, {"GAIN","BASS","TREBLE","VOL"}, {"MIX","DECAY","DAMP","PRE ms"}, {"A ms","D ms","S %","R ms"},{"THRESH","RATIO","REL ms","GAIN"},{"HZ","CENT","WAIT ms","RISE ms"},{"RX CH","CC IN","SYNC","BEATS"},{"RADIO","DEVICE"},{"PLAY","HZ","GATE %","ACCENT"},{"LEVEL %"},{"KEYS"},{"HF LOSS","SAT","WOW","FLUTTER"},{"LOW","MID","MID Hz","HIGH"},{"TYPE","CUT Hz","RES","MIX %"},{"HEAD 2"},{"WAIT ms","RISE ms","LEGATO","SEMI"},{"MODE","ARM"},{"cm/s","MODE"},{"COLOR","BODY"},{"DIR","TONE","DAMP","TREM"},{"RATE","DEPTH"}};
+static const char *const names[][4] = {{"Delay", "FDBK", "Send", "Return"},
+                                       {"Voice", "Drive", "Engine", "Mode"},
+                                       {"Gliss", "MS", "Cent", "HZ"}, {"Drive","Tone","Bias","Mix"}, {"Mode","Root"}, {"Sweep","Res","Tone","Mix"}, {"Gain","Bass","Treble","Vol"}, {"Mix","Decay","Damp","Pre ms"}, {"A ms","D ms","S %","R ms"},{"Thresh","Ratio","Rel ms","Gain"},{"HZ","Cent","Wait ms","Rise ms"},{"RX CH","CC IN","Sync","Beats"},{"Radio","Device"},{"Play","HZ","Gate %","Accent"},{"Level %"},{"Keys"},{"HF Loss","Sat","Wow","Flutter"},{"Low","Mid","Mid Hz","High"},{"Type","Cut Hz","Res","Mix %"},{"Head 2"},{"Wait ms","Rise ms","Legato","Semi"},{"Mode","Arm"},{"cm/s","Mode"},{"Color","Body"},{"Dir","Tone","Damp","Trem"},{"Rate","Depth"}};
 static volatile int knob[][4] = {
     {40, 81, 80, 72}, {0, 55, 0, 0}, {1, 24, 22, 5}, {54,45,18,42}, {0,6}, {40,52,60,0}, {32,48,42,85}, {19,72,52,18}, {38,32,84,36},{46,2,40,12},{5,22,12,20},{0,1,0,8},{0,0},{0,9,72,38},{25},{2},{32,0,0,0},{12,12,4,12},{0,77,0,100},{0},{12,36,1,7},{0,0},{2,0},{4,4,4,4},{0,10,48,0},{1,0}};
 static const int maximum[][4] = {{80, 100, 100, 100},
@@ -64,10 +64,10 @@ static const char *const engines[] = {"FRIPP","ENO","RILEY","RADIGUE","STOCKHAUS
 static const char *const drones[]={"BEATING","SUB","VEIL","FIFTH"};
 static const char *const patterns[]={"OFF","CLIMB","FOLD","PHASE","ORBIT"};
 static const char *const timbre_labels[][4]={
-  {"HAMMER","BODY","DAMPER","RESON."},{"HAMMER","BODY","DAMPER","RESON."},{"STRIKE","ALLOY"},{"WAVE","AIR"},
-  {"TINE","PICKUP"},{"BOW","GLASS"},{"4 FT","2 2/3 FT"},{"EDGE","BREATH"},
-  {"4 FT","MIXTURE"},{"BELLOWS","AIR"},{"BEAT","COLOR"},{"BEAT","COLOR"},
-  {"BEAT","COLOR"},{"BEAT","COLOR"},{"BEAT","COLOR","DRIFT","SHAPE"},{"VOWEL","BLEND","DRIFT","AIR"},{"NOISE","TONE","SWELL","DRIFT"},{"TUNE","INERTIA","MATERIAL","RING"}};
+  {"Hammer","Body","Damper","Reson."},{"Hammer","Body","Damper","Reson."},{"Strike","Alloy"},{"Wave","Air"},
+  {"Tine","Pickup"},{"Bow","Glass"},{"4 FT","2 2/3 FT"},{"Edge","Breath"},
+  {"4 FT","Mixture"},{"Bellows","Air"},{"Beat","Color"},{"Beat","Color"},
+  {"Beat","Color"},{"Beat","Color"},{"Beat","Color","Drift","Shape"},{"Vowel","Blend","Drift","Air"},{"Noise","Tone","Swell","Drift"},{"Tune","Inertia","Material","Ring"}};
 static int voice_kind(void) { if(knob[SOUND][2]==4)return AIR;if(knob[SOUND][2]==1 && knob[SOUND][0]>=6)return EVENING+knob[SOUND][0]-6;return (knob[SOUND][2]==3 ? BEATING : knob[SOUND][2]==2 ? ORGAN : knob[SOUND][2]==1 ? PIANO : SINGING) + knob[SOUND][0]; }
 static int four_timbre(void){int k=voice_kind();return k==PIANO || k==BRIGHT || k>=EVENING;}
 static int page, octave;
@@ -931,20 +931,20 @@ static const char *value_text(int k, char *s) {
 }
 #include "eno_panel.h"
 static unsigned glyph_index(char c){return c>=32 && c<=126?(unsigned)(c-32):31;}
-static void panel_text(int x,int y,const char *s,uint16_t fg,int limit){
+static void panel_text(int x,int y,const char *s,uint16_t fg,int limit,unsigned face){
   int width=0;
-  for(const char *p=s;*p;p++)width+=panel_adv[glyph_index(*p)];
+  for(const char *p=s;*p;p++)width+=panel_adv[face+glyph_index(*p)];
   if(!width)return;
   int out=width<limit?width:limit, left=x-out/2, pen=0;
   for(;*s;s++){
-    unsigned glyph=glyph_index(*s),advance=panel_adv[glyph];
+    unsigned glyph=face+glyph_index(*s),advance=panel_adv[glyph];
     int start=pen*out/width,end=(pen+advance)*out/width;
     for(int col=start;col<end;col++){
       int px=left+col;if(px<0 || px>=(int)cv_w)continue;
       unsigned src=(col-start)*advance/(end-start);
       for(int row=0;row<18;row++){
         if((unsigned)(y+row)>=cv_h)continue;
-        unsigned i=row*16+src, pair=panel_alpha[glyph*144+i/2];
+        unsigned i=row*advance+src, pair=panel_alpha[panel_off[glyph]+i/2];
         unsigned t=(i&1)?pair&15:pair>>4;if(!t)continue;
         uint16_t *p=&cv_px[(y+row)*cv_w+px],bg=swap16(*p);
         unsigned red=((fg>>11)*t+(bg>>11)*(15-t)+7)/15;
@@ -957,7 +957,9 @@ static void panel_text(int x,int y,const char *s,uint16_t fg,int limit){
   }
 }
 static void lettering(int x,int y,const char *s,uint16_t fg,uint16_t bg){
-  (void)bg;panel_text(x,y,s,fg,240);
+  (void)bg;
+  unsigned face=(cv_h==146 && x==120 && y>=0 && y<=12)?95:0;
+  panel_text(x,y,s,fg,240,face);
 }
 static void effect_display(void) {
   int a=knob[page][0], b=knob[page][1], c=knob[page][2], d=knob[page][3];
@@ -1304,7 +1306,7 @@ static void draw(void) {
   }
   cv_blit(0, 0);
   cv_begin(240, 94, ink);
-  lettering(knob[SOUND][2]==4?122:113,0,engines[knob[SOUND][2]],gold,ink);
+  panel_text(knob[SOUND][2]==4?126:112,0,engines[knob[SOUND][2]],gold,knob[SOUND][2]==4?92:58,95);
   char slot_id[]={'P','0'+(program+1)/10,'0'+(program+1)%10,0};
   if(naming){
     lettering(120,20,"PRESETS selects destination",silver,ink);
@@ -1331,10 +1333,11 @@ static void draw(void) {
     if(page==SPEED && !k && !knob[SPEED][1])hi=3;
     vintage_knob(x,41,v-lo,hi-lo);
     char val[8];
-    panel_text(x,60,value_text(k,val),RGB(235,231,220),56);
-    static const char *const piano_fx[]={"DIR","TONE","DAMP","TREM"};
-    static const char *const manual[]={"GLISS","MS","PICK %","CURVE"};
-    panel_text(x,76,page==ART && !knob[SOUND][2]?manual[k]:page==MOTION && k==0 && voice_kind()<=BRIGHT?"BODY":page==TIMBRE?timbre_labels[voice_kind()-PIANO][k]:page==NOTE_FX?piano_fx[k]:names[page][k],RGB(201,175,132),56);
+    panel_text(x,60,value_text(k,val),RGB(235,231,220),56,95);
+    static const char *const piano_fx[]={"Dir","Tone","Damp","Trem"};
+    static const char *const manual[]={"Gliss","MS","Pick %","Curve"};
+    const char *label=page==ART && !knob[SOUND][2]?manual[k]:page==MOTION && k==0 && voice_kind()<=BRIGHT?"BODY":page==TIMBRE?timbre_labels[voice_kind()-PIANO][k]:page==NOTE_FX?piano_fx[k]:names[page][k];
+    panel_text(x,76,label,RGB(215,192,159),56,0);
   }
   cv_blit(0, 146);
 }
