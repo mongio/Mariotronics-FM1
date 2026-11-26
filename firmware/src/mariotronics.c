@@ -66,7 +66,7 @@ static const char *const timbre_labels[][4]={
   {"HAMMER","BODY","DAMPER","RESON."},{"HAMMER","BODY","DAMPER","RESON."},{"STRIKE","ALLOY"},{"WAVE","AIR"},
   {"TINE","PICKUP"},{"BOW","GLASS"},{"4 FT","2 2/3 FT"},{"EDGE","BREATH"},
   {"4 FT","MIXTURE"},{"BELLOWS","AIR"},{"BEAT","COLOR"},{"BEAT","COLOR"},
-  {"BEAT","COLOR"},{"BEAT","COLOR"},{"BEAT","COLOR","DRIFT","SHAPE"},{"VOWEL","BLEND","DRIFT","AIR"},{"NOISE","TONE","SWELL","DRIFT"},{"TUNE","INERTIA","BEAT","NOISE"}};
+  {"BEAT","COLOR"},{"BEAT","COLOR"},{"BEAT","COLOR","DRIFT","SHAPE"},{"VOWEL","BLEND","DRIFT","AIR"},{"NOISE","TONE","SWELL","DRIFT"},{"TUNE","INERTIA","MATERIAL","RING"}};
 static int voice_kind(void) { if(knob[SOUND][2]==4)return AIR;if(knob[SOUND][2]==1 && knob[SOUND][0]>=6)return EVENING+knob[SOUND][0]-6;return (knob[SOUND][2]==3 ? BEATING : knob[SOUND][2]==2 ? ORGAN : knob[SOUND][2]==1 ? PIANO : SINGING) + knob[SOUND][0]; }
 static int four_timbre(void){int k=voice_kind();return k==PIANO || k==BRIGHT || k>=EVENING;}
 static int page, octave;
@@ -100,6 +100,7 @@ static int sinus(unsigned phase);
 static void update_pitch(String *s);
 #include "mt_acoustic.h"
 #include "mt_air.h"
+#include "mt_modal.h"
 static unsigned char held_notes[128], held_counts[128];
 static int phrase_enabled;
 static int held_size;
@@ -141,6 +142,7 @@ static void strike(int slot, int note, int velocity, int kind) {
 
   s->env_q8=s->peaked=s->release_step=s->level=0;
   if(kind==PIANO || kind==BRIGHT){__builtin_memset(&piano_strings[slot],0,sizeof(PianoStrings));__builtin_memset(s->line,0,sizeof s->line);}
+  if(kind==AIR) __builtin_memset(&air_bodies[slot],0,sizeof(AirBody));
   if(kind>=ORGAN){s->sample_wave=s->bell_phase=0;return;}
   if(kind>=PIANO) {
     s->at=-1;
@@ -390,15 +392,7 @@ static int string_tick(String *s) {
     return 0;
   int level=envelope_tick(s);
   if(!s->active) return 0;
-  if(s->kind==AIR){
-    if(!(s->pitch_clock++&15))update_pitch(s);
-    s->phase+=s->increment;
-    s->sample_wave+=s->increment+(unsigned)(air_level*knob[TIMBRE][2])*230u;
-    int voice=16*sinus(s->phase)+12*sinus(s->sample_wave);
-    int grain=(rnd()/256)*air_noise*knob[TIMBRE][3]/128;
-    s->neck+=(grain-s->neck)/(3+(255-air_level)/16);
-    return ((voice+s->neck)*s->strength/4096)*level/32768;
-  }
+  if(s->kind==AIR) return air_modal_tick(s)*level/32768;
   if(s->kind>=EVENING)return motion_sample(s,pad_tick(s))*level/32768;
   if(s->kind>=ORGAN) {
     if (!(s->pitch_clock++ & 15)) update_pitch(s);
