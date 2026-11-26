@@ -1338,9 +1338,9 @@ static void draw(void) {
   cv_blit(0, 0);
   cv_begin(240, 94, ink);
   batt_draw();
-  panel_text(98,0,engines[knob[SOUND][2]],gold,64,95);
+  panel_text(latch_armed?80:98,0,engines[knob[SOUND][2]],gold,latch_armed?54:64,95);
   panel_text(184,0,(reverse && t==HOLD)?"REV":modes[t],silver,38,0);
-  if(latch_armed)panel_text(21,13,"HOLD",gold,36,0);
+  if(latch_armed)panel_text(148,0,"HOLD",gold,32,0);
   char slot_id[]={'P','0'+(program+1)/10,'0'+(program+1)%10,0};
   if(naming){
     lettering(120,20,"PRESETS selects destination",silver,ink);
@@ -1352,9 +1352,9 @@ static void draw(void) {
     }
     cv_blit(0,146);return;
   }
-  lettering(148,0,slot_id,silver,ink);
-  panel_text(31,0,page==ART && !knob[SOUND][2]?"SEL TOUCH":page==ARP && !knob[SOUND][2]?"ARP RATE":pages[page],gold,60,0);
-  int start=latch_armed?43:6;
+  panel_text(latch_armed?119:148,0,slot_id,silver,latch_armed?23:30,0);
+  panel_text(latch_armed?25:31,0,page==ART && !knob[SOUND][2]?"SEL TOUCH":page==ARP && !knob[SOUND][2]?"ARP RATE":pages[page],gold,latch_armed?48:60,0);
+  int start=6;
   int width=length?position*(234u-start)/length:0;
   cv_rect(start,19,234-start,2,metal);
   cv_rect(start,19,width,2,gold);
