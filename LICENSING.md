@@ -18,6 +18,7 @@ complete source under the same licence too.
 | What | Licence | Where |
 | --- | --- | --- |
 | Inter (Rasmus Andersson and the Inter Project Authors), rasterised into `firmware/gen/virgo_font.h` | SIL OFL 1.1 | `assets/fonts/Inter-LICENSE.txt` |
+| Roboto (Google, the Roboto Project Authors), condensed width, rasterised into `firmware/gen/eno_panel.h` by `tools/eno_panel.py` for the Mariotronics panel | SIL OFL 1.1 | `assets/fonts/Roboto-LICENSE.txt` |
 | Terminus font 8x16 (ter-u16n), rendered into `firmware/gen/felucca_font.h` | SIL OFL 1.1 | `assets/fonts/Terminus-LICENSE.txt` |
 | JieLi AC79 SDK: `uboot.boot`, `cfg_tool.bin`, `eq_cfg_hw.bin` are read from your SDK checkout at build time and placed in the package (and inside the built editor `virgo-editor.html`, which carries the packages); no SDK files are in this tree | Apache-2.0 | <https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK> |
 

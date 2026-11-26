@@ -1,5 +1,13 @@
 # Mariotronics ENO Studio Lab
 
+## Lab 7 (1.18-eno7, FM-1_877)
+
+* **Display.** Roboto Condensed throughout. Labels are never squeezed: the status row places page, engine, preset and transport by measured width and moves to the small face when needed. The battery sits on a dark tab at the top right of the screen. FIELD RECEIVER has a moving-needle meter with ballistics and a bar for each Wi-Fi channel; the ARP view lights the playing step and lets it fade.
+* **ARP FEEL** (ENO, RILEY, RADIGUE: press ARP a second time). Swing from straight (default) to 75 % on the first of each pair; Accent OFF, 3+3+2, 4 or 2; Human loosens timing and touch; Repeat plays each step up to four times. ENO no longer forces the swing of PHASE and ORBIT. FRIPP is unchanged.
+* **Wi-Fi modulation.** ROUTING has two routes, each with a target and a signed amount. Targets: the engine's own timbre, Color, Level (down to silence), Pitch (up to a fifth), Filter (opens a low-pass even with FILTER off), Tape (wow and flutter), Plate (send and decay), Arp Rate (up to four times faster or slower) and Density (negative: rests; positive: repeats).
+* ARP FEEL and both routes are stored with each program and in preset backups. Programs and backups from earlier versions load with the defaults; the editor pads older backup files.
+* The startup artwork is stored with PackBits: 25 KB of flash freed, same picture.
+
 ## Lab 6 (1.18-eno6, FM-1_876)
 
 * **Audio from RAM.** The per-sample audio path (voices, effects, tape, plate) and its tables now run from RAM, as in VIRGO. From the flash it shared the XIP cache with the piano recordings, and dense piano polyphony could overrun the audio deadline. At the extremes of the velocity range the piano decodes only the layer it plays. The sound is bit-identical to Lab 5 in FRIPP, ENO, RILEY and RADIGUE.
