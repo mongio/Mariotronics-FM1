@@ -33,8 +33,8 @@ pixels=((a[:,:,0]>>3)<<11)|((a[:,:,1]>>2)<<5)|(a[:,:,2]>>3)
 tables=[('uint16_t','knob_cap',pixels.ravel())]
 alpha=[];widths=[];offsets=[]
 for path,height,baseline in [
-    ('/usr/share/fonts/truetype/open-sans/OpenSans-Regular.ttf',13,14),
-    ('/usr/share/fonts/truetype/dejavu/DejaVuSerifCondensed.ttf',16,14)]:
+    ('/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',13,14),
+    ('/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',16,14)]:
     font=ImageFont.truetype(path,height*scale)
     for i in range(32,127):
         ch=chr(i)

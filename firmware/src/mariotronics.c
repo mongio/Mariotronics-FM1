@@ -935,7 +935,7 @@ static void panel_text(int x,int y,const char *s,uint16_t fg,int limit,unsigned 
   int width=0;
   for(const char *p=s;*p;p++)width+=panel_adv[face+glyph_index(*p)];
   if(!width)return;
-  int out=width<limit?width:limit, left=x-out/2, pen=0;
+  int out=width<limit?width:limit, left=x<0?-x:x-out/2, pen=0;
   for(;*s;s++){
     unsigned glyph=face+glyph_index(*s),advance=panel_adv[glyph];
     int start=pen*out/width,end=(pen+advance)*out/width;

@@ -100,9 +100,9 @@ static void instrument_diagram(void){
     return;
   }
   if(kind==PIANO || kind==BRIGHT || kind>=EVENING){
-    static const char *const titles[]={"Acoustic Piano","Evening Glass","Dusk Choir","Tidal Haze"};
+    static const char *const titles[]={"ACOUSTIC PIANO","EVENING GLASS","DUSK CHOIR","TIDAL HAZE"};
     int face=kind>=EVENING?1+kind-EVENING:0;
-    panel_text(120,2,kind==BRIGHT?"Bright Piano":titles[face],RGB(236,217,178),215,95);
+    panel_text(-7,2,kind==BRIGHT?"BRIGHT PIANO":titles[face],RGB(237,236,228),226,95);
     photo_region(face,0,27,240,104);
     if(kind<=BRIGHT){
       int level=0; for(int i=0;i<4;i++)if(strings[i].active && strings[i].kind<=BRIGHT)level+=strings[i].level/4096;
