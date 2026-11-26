@@ -24,7 +24,7 @@ $('install').onclick=()=>service('installNote',async msg=>{
   const {dev,up}=await usbDevice();
   const loader=dev.id.model==='ota-FM-1';
   const identity=dev.name+' · '+dev.id.text;
-  msg.textContent=identity+' → Mariotronics AIR Lab · '+targetIdentity;
+  msg.textContent=identity+' → Mariotronics Stockhausen Lab · '+targetIdentity;
   const leave=e=>{e.preventDefault();e.returnValue='';};
   let lock,paused=false;
   try{

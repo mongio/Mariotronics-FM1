@@ -38,7 +38,7 @@ static const char *const names[][4] = {{"DELAY", "FDBK", "SEND", "RETURN"},
 static volatile int knob[][4] = {
     {40, 81, 80, 72}, {0, 55, 0, 0}, {1, 24, 22, 5}, {54,45,18,42}, {0,6}, {40,52,60,0}, {32,48,42,85}, {19,72,52,18}, {38,32,84,36},{46,2,40,12},{5,22,12,20},{0,1,0,8},{0,0},{0,9,72,38},{25},{2},{32,0,0,0},{12,12,4,12},{0,77,0,100},{0},{12,36,1,7},{0,0},{2,0},{4,4,4,4},{0,10,48,0},{1,0}};
 static const int maximum[][4] = {{80, 100, 100, 100},
-                                 {1, 100, 3, 1},
+                                 {1, 100, 4, 1},
                                  
                                  {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8},{1,16,95,100},{100},{2},{100,100,100,100},{24,24,8,24},{2,100,100,100},{1},{100,100,1,24},{1,1},{96,1},{8,8,8,8},{1,16,95,100},{2,7}};
 static const int minimum[][4] = {{40}, {0}, {0, 1, 0, 2}, {0}, {0},{0},{0},{0},{0},{0,1,0,0},{2,0,0,0},{0,0,0,1},{0},{0,3,20,0},{0},{0},{0},{0},{0},{0},{0},{0},{0},{0},{0,3,20,0},{0}};
@@ -59,15 +59,15 @@ static int scale_note(int note) {
   }
   return note;
 }
-static const char *const engines[] = {"FRIPP","ENO","RILEY","RADIGUE"};
-static const char *const drones[]={"BEATING","SUB","VEIL","FIFTH","AIR RF"};
+static const char *const engines[] = {"FRIPP","ENO","RILEY","RADIGUE","STOCKHAUSEN"};
+static const char *const drones[]={"BEATING","SUB","VEIL","FIFTH"};
 static const char *const patterns[]={"OFF","CLIMB","FOLD","PHASE","ORBIT"};
 static const char *const timbre_labels[][4]={
   {"HAMMER","BODY","DAMPER","RESON."},{"HAMMER","BODY","DAMPER","RESON."},{"STRIKE","ALLOY"},{"WAVE","AIR"},
   {"TINE","PICKUP"},{"BOW","GLASS"},{"4 FT","2 2/3 FT"},{"EDGE","BREATH"},
   {"4 FT","MIXTURE"},{"BELLOWS","AIR"},{"BEAT","COLOR"},{"BEAT","COLOR"},
   {"BEAT","COLOR"},{"BEAT","COLOR"},{"BEAT","COLOR","DRIFT","SHAPE"},{"VOWEL","BLEND","DRIFT","AIR"},{"NOISE","TONE","SWELL","DRIFT"},{"TUNE","INERTIA","BEAT","NOISE"}};
-static int voice_kind(void) { if(knob[SOUND][2]==3 && knob[SOUND][0]==4)return AIR;if(knob[SOUND][2]==1 && knob[SOUND][0]>=6)return EVENING+knob[SOUND][0]-6;return (knob[SOUND][2]==3 ? BEATING : knob[SOUND][2]==2 ? ORGAN : knob[SOUND][2]==1 ? PIANO : SINGING) + knob[SOUND][0]; }
+static int voice_kind(void) { if(knob[SOUND][2]==4)return AIR;if(knob[SOUND][2]==1 && knob[SOUND][0]>=6)return EVENING+knob[SOUND][0]-6;return (knob[SOUND][2]==3 ? BEATING : knob[SOUND][2]==2 ? ORGAN : knob[SOUND][2]==1 ? PIANO : SINGING) + knob[SOUND][0]; }
 static int four_timbre(void){int k=voice_kind();return k==PIANO || k==BRIGHT || k>=EVENING;}
 static int page, octave;
 static volatile int vib_on = 1;
@@ -675,7 +675,7 @@ static void phrase_tick(void) {
       static const int intervals[][8]={{0,7,14,16,19,24,26,31},{0,2,5,7,9,12,14,17},{0,5,7,12,17,19,24,31}};
       int index=order[bound(knob[ARP][0]-1,0,3)][phrase_step];
       velocity_note=phrase_keys[index%phrase_size];
-      n=scale_note(bound(phrase_size==1?root+intervals[knob[SOUND][2]-1][index]:velocity_note,0,127));
+      n=scale_note(bound(phrase_size==1?root+intervals[bound(knob[SOUND][2]-1,0,2)][index]:velocity_note,0,127));
     }
     int left=phrase_size==1?root:phrase_keys[phrase_size-2];
     int right=phrase_size==1?scale_note(bound(root+knob[PICK_ART][3],0,127)):phrase_keys[phrase_size-1];
@@ -902,7 +902,7 @@ static const char *value_text(int k, char *s) {
   }
   if (page == SOUND) {
     if (k == 0)
-      return knob[SOUND][2]==3 ? drones[v] : knob[SOUND][2]==2 ? riley_voices[v] : knob[SOUND][2]==1 ? ambient_voices[v] : voices[v];
+      return knob[SOUND][2]==4 ? "FIELD" : knob[SOUND][2]==3 ? drones[v] : knob[SOUND][2]==2 ? riley_voices[v] : knob[SOUND][2]==1 ? ambient_voices[v] : voices[v];
     if (k == 3)
       return v ? "LOOP" : "TAPE";
     if (k == 2)
@@ -1289,7 +1289,7 @@ static void draw(void) {
   }
   cv_blit(0, 0);
   cv_begin(240, 94, ink);
-  lettering(113,0,engines[knob[SOUND][2]],gold,ink);
+  lettering(knob[SOUND][2]==4?122:113,0,engines[knob[SOUND][2]],gold,ink);
   char slot_id[]={'P','0'+(program+1)/10,'0'+(program+1)%10,0};
   if(naming){
     lettering(120,20,"PRESETS selects destination",silver,ink);
@@ -1301,7 +1301,7 @@ static void draw(void) {
     }
     cv_blit(0,146);return;
   }
-  lettering(155,0,slot_id,silver,ink);
+  if(knob[SOUND][2]!=4)lettering(155,0,slot_id,silver,ink);
   lettering(46,0,page==ART && !knob[SOUND][2]?"SEL TOUCH":page==ARP && !knob[SOUND][2]?"ARP RATE":pages[page],gold,ink);
   if(t==HOLD) cv_rect(178,0,56,18,gold);
   lettering(204,0,(reverse && t==HOLD)?"REV":modes[t],t==HOLD?ink:silver,t==HOLD?gold:ink);
@@ -1312,7 +1312,7 @@ static void draw(void) {
     if ((page == OFF_TAPE || page == LIGHTS || page == HEAD2) && k > 0) break;
     if ((page == SCALE || page == BT || page==ERASE || page==SPEED || (page==TIMBRE && !four_timbre()) || page==MOTION) && k >= 2) break;
     int x = (page == SCALE || page == BT || page==ERASE || page==SPEED || (page==TIMBRE && !four_timbre()) || page==MOTION) ? 60 + 120 * k : 30 + 60 * k;
-    int v = knob[page][k], lo = minimum[page][k], hi = page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?8:(knob[SOUND][2]==3?4:3)):maximum[page][k];
+    int v = knob[page][k], lo = minimum[page][k], hi = page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?8:(knob[SOUND][2]==4?0:3)):maximum[page][k];
     if(page==SPEED && !k && !knob[SPEED][1])hi=3;
     vintage_knob(x,40,v-lo,hi-lo);
     char val[8];
@@ -1366,7 +1366,7 @@ static void apply_events(void) {
     if (panic) {pedal=0;reader=writer;phrase_size=0;for(int i=0;i<128;i++)phrase_count[i]=0;}
     panic = 0;
   }
-  int picking=knob[ARP][0]!=0;
+  int picking=knob[SOUND][2]!=4 && knob[ARP][0]!=0;
   if(phrase_enabled!=picking){
     phrase_reset();phrase_enabled=picking;
     if(picking)phrase_start();
@@ -1477,7 +1477,7 @@ static void app_setup(void) {
 static void set_control(int k,int v) {
   intro=0;
   if(page==ERASE && (!k || !knob[ERASE][0])){knob[ERASE][1]=0;if(k)return;}
-  if(page==SOUND && k==2) { switch_engine(bound(v,0,3)); return; }
+  if(page==SOUND && k==2) { switch_engine(bound(v,0,4)); return; }
   if(page==BT && k==0) {
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
     v=radio_power(v!=0);
@@ -1501,8 +1501,8 @@ static void set_control(int k,int v) {
   if(page==CHARACTER && knob[page][k]!=bound(v,0,100)) {
     globals[1+k]=bound(v,0,100); globals_changed=1; light_changed=fm1_ms;
   }
-  if(page==SOUND && !k && knob[SOUND][2]==3 && knob[SOUND][0]!=4 && v>=4)knob[TIMBRE][0]=0;
-  knob[page][k]=bound(v,minimum[page][k],page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?8:(knob[SOUND][2]==3?4:3)):maximum[page][k]);
+  
+  knob[page][k]=bound(v,minimum[page][k],page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?8:(knob[SOUND][2]==4?0:3)):maximum[page][k]);
   if(knob[SOUND][2] && page==LFO && k<2) knob[ART][3-k]=knob[LFO][k];
   if(knob[SOUND][2] && page==ART && k>=2) knob[LFO][3-k]=knob[ART][k];
 
@@ -1562,7 +1562,7 @@ static void app_step(void) {
     page = HOME;
   if (edge & (1u << BTN_LFO)) { if(page==LFO) vib_on=!vib_on; page=LFO; }
   if (edge & (1u << BTN_EDIT))
-    page = knob[SOUND][2] && page==SOUND ? TIMBRE :
+    page = knob[SOUND][2]==4 ? TIMBRE : knob[SOUND][2] && page==SOUND ? TIMBRE :
            knob[SOUND][2] && page==TIMBRE ? MOTION :
            knob[SOUND][2]==1 && page==MOTION ? NOTE_FX :
            knob[SOUND][2]==1 && page==NOTE_FX ? HEAD2 : SOUND;
@@ -1611,7 +1611,7 @@ static void app_step(void) {
     }
   d = fm1_enc_take(ENC_ALGORITHM);
   if(d)intro=0;
-  if (d && !naming) switch_engine(bound(knob[SOUND][2]+d,0,3));
+  if (d && !naming) switch_engine(bound(knob[SOUND][2]+d,0,4));
   d = fm1_enc_take(ENC_PRESETS);
   if(d)intro=0;
   if (d)

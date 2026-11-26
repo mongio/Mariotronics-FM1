@@ -149,7 +149,7 @@ static void motion_view(void){
 }
 
 static void air_display(void){
-    lettering(120,2,"AIR / FIELD RECEIVER",gold,0);
+    lettering(120,2,"FIELD RECEIVER",gold,0);
     cv_rect(18,28,204,50,RGB(208,183,131));
     for(int i=0;i<=10;i++)cv_line(27+18*i,36,27+18*i,36+(i%5?4:9),ink);
     cv_line(120,76,28+air_level*180/255,38,RGB(133,46,29));
