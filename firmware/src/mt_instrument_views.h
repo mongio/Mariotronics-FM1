@@ -16,12 +16,20 @@ static void photo_region(int face,int x,int y,int width,int height){
   }
 }
 static void vintage_knob(int x,int y,int position,int range){
-  dot_at(x+1,y+2,13,RGB(43,31,19));
-  dot_at(x,y,13,RGB(163,134,94));dot_at(x,y-1,11,RGB(76,68,53));
-  dot_at(x,y,10,RGB(42,37,30));dot_at(x,y,8,RGB(51,44,34));
+  for(int row=0;row<37;row++)for(int col=0;col<37;col++)
+    cv_pset(x+col-18,y+row-18,knob_cap[row*37+col]);
   unsigned angle=0xa0000000u+(0xc0000000u/256)*(range?position*256/range:0);
-  cv_line(x+sinus(angle)*4/128,y-sinus(angle+0x40000000u)*4/128,
-          x+sinus(angle)*11/128,y-sinus(angle+0x40000000u)*11/128,RGB(255,226,170));
+  int dx=sinus(angle),dy=-sinus(angle+0x40000000u);
+  for(int j=-12;j<=12;j++)for(int i=-12;i<=12;i++){
+    int along=i*dx+j*dy,side=absolute(i*dy-j*dx);
+    if(along<380 || along>1450 || side>=145)continue;
+    int alpha=bound(180-side,0,128);
+    uint16_t bg=knob_cap[(j+18)*37+i+18];
+    int red=((bg>>11)*(128-alpha)+30*alpha)>>7;
+    int green=(((bg>>5)&63)*(128-alpha)+56*alpha)>>7;
+    int blue=((bg&31)*(128-alpha)+22*alpha)>>7;
+    cv_pset(x+i,y+j,(red<<11)|(green<<5)|blue);
+  }
 }
 static void fretboard(void){
   static const int open[]={64,59,55,50,45,40};

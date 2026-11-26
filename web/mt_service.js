@@ -1,10 +1,10 @@
-const targetIdentity='FM-1_870';
+const targetIdentity='FM-1_871';
 const isFm1=id=>id.model==='FM-1'||id.model==='ota-FM-1';
 let servicing=false;
 async function service(status,action){
   if(servicing)return;
   servicing=true;
-  const ids=['install','bankRead','bankWrite','power','bankTarget'];
+  const ids=['install','enoInstall','bankRead','bankWrite','power','bankTarget'];
   const previous=ids.map(id=>$(id).disabled);
   ids.forEach(id=>$(id).disabled=true);
   try{await action($(status));}
@@ -24,7 +24,7 @@ $('install').onclick=()=>service('installNote',async msg=>{
   const {dev,up}=await usbDevice();
   const loader=dev.id.model==='ota-FM-1';
   const identity=dev.name+' · '+dev.id.text;
-  msg.textContent=identity+' → Mariotronics Stockhausen Lab · '+targetIdentity;
+  msg.textContent=identity+' → Mariotronics ENO Studio Lab · '+targetIdentity;
   const leave=e=>{e.preventDefault();e.returnValue='';};
   let lock,paused=false;
   try{
@@ -65,7 +65,7 @@ async function presetConnection(){
     },commit(){localStorage.setItem('mt.programBank.v1',btoa(String.fromCharCode(...store)));}};
   }
   const {dev}=await usbDevice();
-  if(dev.id.text!==targetIdentity && dev.id.text!=="FM-1_869" && dev.id.text!=="FM-1_868" && dev.id.text!=="FM-1_857" && dev.id.text!=="FM-1_856" && dev.id.text!=="FM-1_855" && dev.id.text!=="FM-1_854"){dev.link.close();throw Error('USB preset transfer requires a running Mariotronics 1.4 through 1.7 or version 1.18.');}
+  if(dev.id.text!==targetIdentity && dev.id.text!=="FM-1_870" && dev.id.text!=="FM-1_869" && dev.id.text!=="FM-1_868" && dev.id.text!=="FM-1_857" && dev.id.text!=="FM-1_856" && dev.id.text!=="FM-1_855" && dev.id.text!=="FM-1_854"){dev.link.close();throw Error('USB preset transfer requires a running Mariotronics 1.4 through 1.7 or version 1.18.');}
   return {name:dev.id.text,close:()=>dev.link.close(),commit(){},async request(frame){
     dev.link.drain();
     if(!dev.link.send([0xf0,...frame,0xf7]))throw Error('FM-1 disconnected.');
@@ -117,4 +117,35 @@ $('bankFile').onchange=()=>service('bankStatus',async msg=>{
     }
     await exchange(conn,5,0);conn.commit();msg.textContent='Restored 64 preset slots on '+conn.name+'.';
   }finally{conn.close();}
+});
+
+$('enoInstall').onclick=()=>service('installNote',async msg=>{
+  const {dev}=await usbDevice();
+  try {
+    if(dev.id.text!==targetIdentity)throw Error('Install the ENO Studio Lab firmware first.');
+    if(!confirm('Install the optional ENO piano sustain bank in unused sample memory? Keep the FM-1 powered and USB connected.'))return;
+    const request=async(op,lo,data=[])=>{
+      dev.link.drain();
+      if(!dev.link.send([240,...presetPrefix,op,lo,...data,247]))throw Error('FM-1 disconnected.');
+      const until=Date.now()+6000;
+      while(Date.now()<until){
+        const p=await dev.link.read(until-Date.now());
+        if(p?.length===9 && p[0]===240 && p[8]===247 && presetPrefix.every((v,i)=>p[i+1]===v) && p[5]===op && p[6]===lo)return p[7];
+      }
+      throw Error('USB timeout. Reconnect and run the bank installer again to resume.');
+    };
+    const status=await request(10,0);
+    if(status===2){msg.textContent='Existing sample bank preserved. ENO uses its internal piano.';return;}
+    if(status===3){msg.textContent='ENO sustain bank already installed and verified.';return;}
+    if(status)throw Error('Sample flash unavailable.');
+    const bank=bytes(enoTail);
+    for(let off=0;off<bank.length;off+=128){
+      const index=off/128,data=[index>>7];
+      for(const b of bank.subarray(off,off+128))data.push(b>>4,b&15);
+      if(await request(11,index&127,data))throw Error('Bank write failed. Reconnect and retry.');
+      if(!(index%16))msg.textContent='Installing ENO piano sustain bank · '+Math.floor(100*off/bank.length)+'%';
+    }
+    if(await request(12,0))throw Error('Sample bank verification failed.');
+    msg.textContent='ENO piano sustain bank installed and verified.';
+  }finally{dev.link.close();}
 });

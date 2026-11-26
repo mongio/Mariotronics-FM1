@@ -11,6 +11,7 @@
 #include "mt_ble.h"
 #include "mt_intro.h"
 #include "mt_piano.h"
+#include "mt_eno_bank.h"
 #include "mt_vu.h"
 #include "mt_global.h"
 
@@ -88,7 +89,7 @@ static int rnd(void) {
 typedef struct {
   unsigned phase, increment, vibrato, sample_pos, sample_step, sample_wave, bell_phase;
   unsigned motion_phase; int motion_filter;
-  int sample_root, sample_reverse, hammer_filter, damper, piano_tone, tremolo;
+  int sample_full, sample_root, sample_reverse, hammer_filter, damper, piano_tone, tremolo;
   int bloom, strength, neck, pitch, start_pitch, target_pitch, glide_ticks, glide_at, pitch_clock;
   int16_t line[STRING_LEN];
   int note, gate, active, kind, at, delay, lp, level, attack, age;
@@ -146,9 +147,10 @@ static void strike(int slot, int note, int velocity, int kind) {
   if(kind>=ORGAN){s->sample_wave=s->bell_phase=0;return;}
   if(kind>=PIANO) {
     s->at=-1;
-    s->sample_root=bound((note-34)/9,0,5);
+    s->sample_root=bound((note-32)/9,0,5);
+    s->sample_full=(kind<=BRIGHT && eno_extended);
     s->sample_reverse=knob[NOTE_FX][0];
-    s->sample_pos=s->sample_reverse ? (note_frames(kind)-2)<<16 : 0;
+    s->sample_pos=s->sample_reverse ? (note_frames(kind)+(s->sample_full?TAIL_FRAMES:0)-2)<<(kind<=BRIGHT?15:16) : 0;
     s->sample_step=timeline_step(kind,note);
     s->strength=velocity;
     s->hammer_filter=0; s->sample_wave=s->bell_phase=0; s->piano_tone=128; s->damper=48; s->tremolo=0;
@@ -269,14 +271,22 @@ static void update_pitch(String *s) {
   s->delay = delay;
   s->increment = (0xffffffffu / ((unsigned)delay + 64u)) * 256u;
 }
+static const uint8_t *piano_packet(unsigned zone,unsigned block){
+  unsigned base_blocks=PIANO_FRAMES/64;
+  if(block<base_blocks)return piano_bank+35*(zone*base_blocks+block);
+  return eno_flash+16+35*(zone*(TAIL_FRAMES/64)+block-base_blocks);
+}
 static void piano_block(String *s,unsigned block){
   int weight=bound((s->strength-35)*3+(s->kind==BRIGHT?65:0),0,256);
   for(int layer=0;layer<2;layer++){
-    const uint8_t *p=piano_bank+35*((2*s->sample_root+layer)*(PIANO_FRAMES/64)+block);
+    unsigned zone=2*s->sample_root+layer;
+    const uint8_t *p=piano_packet(zone,block);
     int pred=(int16_t)(p[0]+256*p[1]),index=p[2];
     for(int i=0;i<=64;i++){
       if(i==64){
-        if(block+1<PIANO_FRAMES/64)pred=(int16_t)(p[35]+256*p[36]);
+        if(block+1<(PIANO_FRAMES+(s->sample_full?TAIL_FRAMES:0))/64){
+          const uint8_t *q=piano_packet(zone,block+1);pred=(int16_t)(q[0]+256*q[1]);
+        }
       }else if(i){
         int byte=p[3+(i-1)/2],code=i&1?byte&15:byte>>4;
         int step=ima_step[index];
@@ -295,22 +305,25 @@ static int piano_tick(String *s) {
     update_pitch(s);
     unsigned read_delay=s->delay+64;
     s->sample_step=(timeline_step(s->kind,s->note)/32)*(period256[s->note]+64u)/read_delay*32;
+    if(s->kind<=BRIGHT) s->sample_step=(unsigned)((uint64_t)11889*(period256[36+9*s->sample_root]+64u)/read_delay);
     if(knob[SOUND][2]==1) {
       s->piano_tone=bound(16+knob[NOTE_FX][1]*7+(knob[TIMBRE][0]-4)*12+s->strength/2+(s->kind==BRIGHT?45:0),16,245);
       s->damper=knob[NOTE_FX][2];
       s->tremolo=knob[NOTE_FX][3];
     }
   }
-  unsigned frames=note_frames(s->kind);
-  unsigned at=s->sample_pos>>16;
+  unsigned frames=note_frames(s->kind)+(s->sample_full?TAIL_FRAMES:0);
+  unsigned shift=s->kind<=BRIGHT?15:16;
+  unsigned at=s->sample_pos>>shift;
   int sample;
   if(s->kind<=BRIGHT) {
     if(s->at!=(int)(at>>6))piano_block(s,at>>6);
     int a=piano_strings[s-strings].decoded[at&63],b=piano_strings[s-strings].decoded[(at&63)+1];
-    sample=a+(b-a)*(int)((s->sample_pos>>8)&255)/256;
+    sample=a+(b-a)*(int)((s->sample_pos>>7)&255)/256;
+    sample=sample*(int)bound(frames-1-at,0,3200)/3200;
     if(!s->sample_reverse){
-      if(s->sample_pos==((frames-1)<<16))sample=0;
-      sample+=piano_bridge(s,sample);
+      if(s->sample_pos==((frames-1)<<shift))sample=0;
+      sample+=piano_bridge(s,sample)/3;
     }
     s->neck+=(sample-s->neck)/12;sample+=(knob[TIMBRE][1]-4)*s->neck/8;
   } else {
@@ -352,9 +365,9 @@ static int piano_tick(String *s) {
   s->hammer_filter+=(sample-s->hammer_filter)*tone/256;
   s->phase+=486957u; /* 5 Hz tremolo */
   int amp=256-(127+sinus(s->phase))*s->tremolo/200;
-  if(!s->sample_reverse && s->kind<=BRIGHT && s->sample_step>=((frames-1)<<16)-s->sample_pos)s->sample_pos=(frames-1)<<16;
+  if(!s->sample_reverse && s->kind<=BRIGHT && s->sample_step>=((frames-1)<<shift)-s->sample_pos)s->sample_pos=(frames-1)<<shift;
   else if(s->sample_reverse ? s->sample_pos<s->sample_step :
-      s->sample_step>=((frames-1)<<16)-s->sample_pos) s->active=0;
+      s->sample_step>=((frames-1)<<shift)-s->sample_pos) s->active=0;
   else s->sample_pos+=s->sample_reverse ? -s->sample_step : s->sample_step;
   return (s->hammer_filter*s->strength/127)*amp/256;
 }
@@ -916,27 +929,35 @@ static const char *value_text(int k, char *s) {
   number(s, v);
   return s;
 }
-/* Antialiased UI glyphs on a solid background, centered at the given x. */
-static void lettering(int x, int y, const char *s, uint16_t fg, uint16_t bg) {
-  int width = 0;
-  for (const char *p = s; *p; p++) width += font_width[*p - 32];
-  x -= width / 2;
-  for (; *s; s++) {
-    int glyph = *s - 32;
-    const uint8_t *alpha = font_alpha + glyph * 135;
-    for (int j = 0; j < 18; j++) {
-      for (int k = 0; k < 15; k++) {
-        int offset=j*15+k; int pair=alpha[offset/2];int shade=17*((offset&1)?pair&15:pair>>4);
-        if (!shade || x+k < 0 || x+k >= 240 || y+j >= (int)cv_h) continue;
-        int back = 255 - shade;
-        int r = ((fg >> 11) * shade + (bg >> 11) * back + 127) / 255;
-        int g = (((fg >> 5) & 63) * shade + ((bg >> 5) & 63) * back + 127) / 255;
-        int b = ((fg & 31) * shade + (bg & 31) * back + 127) / 255;
-        cv_px[(y+j)*240+x+k] = swap16((r<<11)|(g<<5)|b);
+#include "eno_panel.h"
+static unsigned glyph_index(char c){return c>=32 && c<=126?(unsigned)(c-32):31;}
+static void panel_text(int x,int y,const char *s,uint16_t fg,int limit){
+  int width=0;
+  for(const char *p=s;*p;p++)width+=panel_adv[glyph_index(*p)];
+  if(!width)return;
+  int out=width<limit?width:limit, left=x-out/2, pen=0;
+  for(;*s;s++){
+    unsigned glyph=glyph_index(*s),advance=panel_adv[glyph];
+    int start=pen*out/width,end=(pen+advance)*out/width;
+    for(int col=start;col<end;col++){
+      int px=left+col;if(px<0 || px>=(int)cv_w)continue;
+      unsigned src=(col-start)*advance/(end-start);
+      for(int row=0;row<18;row++){
+        if((unsigned)(y+row)>=cv_h)continue;
+        unsigned i=row*16+src, pair=panel_alpha[glyph*144+i/2];
+        unsigned t=(i&1)?pair&15:pair>>4;if(!t)continue;
+        uint16_t *p=&cv_px[(y+row)*cv_w+px],bg=swap16(*p);
+        unsigned red=((fg>>11)*t+(bg>>11)*(15-t)+7)/15;
+        unsigned green=(((fg>>5)&63)*t+((bg>>5)&63)*(15-t)+7)/15;
+        unsigned blue=((fg&31)*t+(bg&31)*(15-t)+7)/15;
+        *p=swap16((red<<11)|(green<<5)|blue);
       }
     }
-    x += font_width[glyph];
+    pen+=advance;
   }
+}
+static void lettering(int x,int y,const char *s,uint16_t fg,uint16_t bg){
+  (void)bg;panel_text(x,y,s,fg,240);
 }
 static void effect_display(void) {
   int a=knob[page][0], b=knob[page][1], c=knob[page][2], d=knob[page][3];
@@ -1308,12 +1329,12 @@ static void draw(void) {
     int x = (page == SCALE || page == BT || page==ERASE || page==SPEED || (page==TIMBRE && !four_timbre()) || page==MOTION) ? 60 + 120 * k : 30 + 60 * k;
     int v = knob[page][k], lo = minimum[page][k], hi = page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?8:(knob[SOUND][2]==4?0:3)):maximum[page][k];
     if(page==SPEED && !k && !knob[SPEED][1])hi=3;
-    vintage_knob(x,40,v-lo,hi-lo);
+    vintage_knob(x,41,v-lo,hi-lo);
     char val[8];
-    lettering(x,55,value_text(k,val),silver,ink);
+    panel_text(x,60,value_text(k,val),RGB(235,231,220),56);
     static const char *const piano_fx[]={"DIR","TONE","DAMP","TREM"};
     static const char *const manual[]={"GLISS","MS","PICK %","CURVE"};
-    lettering(x,73,page==ART && !knob[SOUND][2]?manual[k]:page==MOTION && k==0 && voice_kind()<=BRIGHT?"BODY":page==TIMBRE?timbre_labels[voice_kind()-PIANO][k]:page==NOTE_FX?piano_fx[k]:names[page][k],gold,ink);
+    panel_text(x,76,page==ART && !knob[SOUND][2]?manual[k]:page==MOTION && k==0 && voice_kind()<=BRIGHT?"BODY":page==TIMBRE?timbre_labels[voice_kind()-PIANO][k]:page==NOTE_FX?piano_fx[k]:names[page][k],RGB(201,175,132),56);
   }
   cv_blit(0, 146);
 }
@@ -1450,6 +1471,7 @@ static void update_leds(unsigned keys) {
   previous_keys = keys;
 }
 static void app_setup(void) {
+  eno_open();
   for(unsigned i=0;i<1024;i++)scope_ring[i]=0;
   unsigned char stored[7];
   if(!settings_load(stored,7) && stored[6]<=1 && stored[5]<=(stored[6]?96:3)){
@@ -1664,7 +1686,8 @@ static void web_presets_out(void) {}
 static void web_presets_in(void) {}
 static uint8_t *web_bank_buf(void) { return (uint8_t *)0; }
 static uint32_t web_bank_size(void) { return 0; }
-static void web_bank_changed(void) {}
+static void web_bank_changed(void) { eno_open(); }
+WEB_EXPORT("eno_extended") int web_eno_extended(void){return eno_extended;}
 static uint32_t web_state(void) {
   return ((naming?destination:program) << 16) | (knob[SOUND][2] << 12) | (naming << 11) | (page & 15) | (transport << 4) | ((knob[ARP][0]!=0) << 8) | (vib_on << 9) | (reverse << 10);
 }

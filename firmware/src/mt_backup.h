@@ -64,6 +64,11 @@ static void app_sysex(const uint8_t *p,uint32_t n) {
   uint8_t *data=(uint8_t *)&transfer_bank;
   unsigned left=idx<CHUNKS?sizeof transfer_bank-idx*CHUNK:0;
   unsigned count=left>CHUNK?CHUNK:left;
+#ifndef DINGHY_HOST
+  if(op>=10 && op<=12){
+    reply[7]=eno_transfer(p,n);reply[len++]=0xf7;sysex_send(reply,len);return;
+  }
+#endif
   if((op==1 || op==3) && n==3 && idx==0){
     transfer_mode=op;transfer_index=0;transfer_generation=bank_generation;
     if(op==1)snapshot_bank();
