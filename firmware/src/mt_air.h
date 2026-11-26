@@ -13,18 +13,14 @@ static unsigned air_tail,air_used,air_play;
 static uint8_t air_history[160][2];
 static volatile int air_level,air_noise;
 static int air_filtered;
-#ifdef UI_PROP
 static int air_heat[14];
-#endif
 static int air_same(const uint8_t *a,const uint8_t *b){
     for(unsigned i=0;i<6;i++)if(a[i]!=b[i])return 0;
     return 1;
 }
 static void air_receive(const uint8_t *frame,unsigned length,int dbm,unsigned channel,unsigned now){
     if(length<24 || dbm>=0 || dbm < -120)return;
-#ifdef UI_PROP
     if(channel>=1 && channel<=13 && dbm+100>air_heat[channel])air_heat[channel]=dbm+100;
-#endif
     int beacon=frame[0]==0x80 && length>=36;
     for(unsigned i=0;i<air_count;i++){
         AirStation *s=&air_stations[i];

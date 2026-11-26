@@ -37,7 +37,7 @@ LIB='/usr/share/fonts/truetype/liberation/'
 ROB='/usr/share/fonts/truetype/google-fonts/ofl/roboto/Roboto[wdth,wght].ttf'
 FACES={'liberation':[(LIB+'LiberationSans-Regular.ttf',13,14,None),(LIB+'LiberationSans-Regular.ttf',16,14,None)],
        'narrow':[(LIB+'LiberationSansNarrow-Regular.ttf',14,14,None),(LIB+'LiberationSansNarrow-Regular.ttf',17,14,None)],
-       'roboto':[(ROB,13,14,(430,75)),(ROB,16,14,(520,75))]}[os.environ.get('MT_FONT','liberation')]
+       'roboto':[(ROB,13,14,(430,75)),(ROB,16,14,(520,75))]}[os.environ.get('MT_FONT','roboto')]
 for path,height,baseline,axes in FACES:
     font=ImageFont.truetype(path,height*scale)
     if axes:font.set_variation_by_axes(list(axes))

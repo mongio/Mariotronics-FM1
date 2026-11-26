@@ -79,7 +79,6 @@ static void modular_deck(unsigned clock){
   for(int i=0;i<5;i++)cv_rect(171+11*i,96,7,9,silver);
   lettering(81,123,"ARP 2500",gold,0);lettering(198,123,"TAPE",silver,0);
 }
-#ifdef UI_PROP
 static void pattern_view(void){
   static const unsigned char paths[][8]={{0,1,2,3,4,5,6,7},{0,1,2,3,2,1,0,1},{0,2,1,3,1,4,2,5},{0,3,1,4,2,5,1,3}};
   static unsigned glow[8];                       /* each step fades after it plays */
@@ -98,17 +97,6 @@ static void pattern_view(void){
     disc(x+9,121,2,i==now?gold:RGB(50,52,48));
   }
 }
-#else
-static void pattern_view(void){
-  static const unsigned char paths[][8]={{0,1,2,3,4,5,6,7},{0,1,2,3,2,1,0,1},{0,2,1,3,1,4,2,5},{0,3,1,4,2,5,1,3}};
-  int mode=knob[ARP][0];
-  lettering(120,9,patterns[mode],gold,0);
-  for(int i=0;i<8;i++){
-    int h=8+9*paths[bound(mode-1,0,3)][i];
-    cv_rect(19+26*i,112-h,18,h,mode && phrase_size && ((phrase_step+7)&7)==i?gold:metal);
-  }
-}
-#endif
 static void instrument_diagram(void){
   int kind=voice_kind(),a=knob[TIMBRE][0],b=knob[TIMBRE][1];
   if(page==HEAD2 || page==NOTE_FX){
@@ -177,7 +165,6 @@ static void motion_view(void){
   lettering(120,120,kind<=BRIGHT?"BODY RESPONSE":"MODULATION",silver,0);
 }
 
-#ifdef UI_PROP
 static void air_display(void){
   static int needle;
   lettering(120,2,"FIELD RECEIVER",gold,0);
@@ -211,24 +198,3 @@ static void air_display(void){
     else {status[0]='-';number(status+1,-s->dbm);lettering(190,126,status,gold,0);}
   }else lettering(120,126,air_frozen?"FROZEN":"SCANNING",silver,0);
 }
-#else
-static void air_display(void){
-    lettering(120,2,"FIELD RECEIVER",gold,0);
-    cv_rect(18,28,204,50,RGB(208,183,131));
-    for(int i=0;i<=10;i++)cv_line(27+18*i,36,27+18*i,36+(i%5?4:9),ink);
-    cv_line(120,76,28+air_level*180/255,38,RGB(133,46,29));
-    char status[20];
-    if(air_started<0)lettering(120,82,"NO RF CALIBRATION",silver,0);
-    else if(air_pick>=0 && air_pick<(int)air_count){
-        AirStation *s=&air_stations[air_pick];
-        lettering(93,82,s->name[0]?s->name:"HIDDEN",silver,0);
-        if(fm1_ms-s->last>3000)lettering(183,82,"LOST",silver,0);
-        else {status[0]='-';number(status+1,-s->dbm);lettering(183,82,status,gold,0); }
-    }else lettering(120,82,"SCANNING",silver,0);
-#if defined(GRANA_WEB) || defined(DINGHY_HOST)
-    lettering(120,108,air_frozen?"DEMO / FROZEN":"DEMO / SIMULATED RF",gold,0);
-#else
-    lettering(120,108,air_frozen?"FROZEN":air_locked?"TUNED":"AUTO SCAN",gold,0);
-#endif
-}
-#endif

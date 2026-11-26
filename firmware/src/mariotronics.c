@@ -996,12 +996,10 @@ static void panel_text(int x,int y,const char *s,uint16_t fg,int limit,unsigned 
   int width=0;
   for(const char *p=s;*p;p++)width+=panel_adv[face+glyph_index(*p)];
   if(!width)return;
-#ifdef UI_PROP
   if(width>limit && face){            /* too wide: the small face before any squeezing */
     int small=0;for(const char *p=s;*p;p++)small+=panel_adv[glyph_index(*p)];
     if(small<=limit || small<width){face=0;width=small;}
   }
-#endif
   int out=width<limit?width:limit, left=x<0?-x:x-out/2, pen=0;
   for(;*s;s++){
     unsigned glyph=face+glyph_index(*s),advance=panel_adv[glyph];
@@ -1082,6 +1080,15 @@ static unsigned intro_ease(unsigned elapsed,unsigned duration) {
   unsigned x=elapsed*255/duration;
   return x*x*(765-2*x)/65025;
 }
+/* PackBits (tools/pack_intro.py): n < 128 copies n+1 pixels, n >= 128 repeats one n-125 times. */
+static void unpack_intro(const unsigned char *src,const uint16_t *palette,unsigned count){
+  uint16_t *dst=cv_px,*end=cv_px+count;
+  while(dst<end){
+    unsigned n=*src++;
+    if(n<128){for(n++;n && dst<end;n--)*dst++=palette[*src++];}
+    else{uint16_t c=palette[*src++];for(n-=125;n && dst<end;n--)*dst++=c;}
+  }
+}
 static void boot_draw(unsigned ms) {
   unsigned brightness=intro_ease(ms,650)*(255-intro_ease(ms>5000?ms-5000:0,550))/255;
   unsigned title=brightness*intro_ease(ms>3500?ms-3500:0,550)/255;
@@ -1093,7 +1100,7 @@ static void boot_draw(unsigned ms) {
   }
   cv_begin(240,52,0);cv_blit(0,0);
   cv_begin(240,136,0);
-  for(unsigned i=0;i<240*136;i++)cv_px[i]=colors[intro_art[i]];
+  unpack_intro(intro_art,colors,240*136);
   /* Closed return path in local LCD coordinates, clockwise from the record head. */
   const int route[][2]={{75,79},{170,79},{172,77},{172,10},{170,8},{78,8},{75,11},{75,79}};
   enum { PATH_LENGTH=95+4+67+4+92+6+68 };
@@ -1114,7 +1121,7 @@ static void boot_draw(unsigned ms) {
   }
   cv_blit(0,52);
   cv_begin(240,52,0);
-  for(unsigned i=0;i<240*22;i++)cv_px[i]=letters[intro_art[240*136+i]];
+  unpack_intro(intro_title,letters,240*22);
 
   cv_blit(0,188);
 }
@@ -1259,20 +1266,6 @@ static uint32_t batt_level(void)
 #endif
 }
 static uint32_t batt_shown(void) { uint32_t l = batt_level(); return l == 1u && (fm1_ms >> 9 & 1u) ? 0u : l; }   /* 0: the blink's off half */
-static int32_t batt_draw(void)               /* on the header's canvas, right-aligned; returns its left edge */
-{
-    uint32_t l = batt_shown(), k;
-    int x=226,y=2;
-    uint16_t c=l==2?RGB(240,200,60):l<2?RGB(255,70,60):RGB(80,210,100);
-    uint16_t rim=l==5?c:RGB(150,146,140);
-    cv_rect(x+3,0,5,2,rim);cv_rect(x,y,11,1,rim);cv_rect(x,17,11,1,rim);
-    cv_rect(x,y,1,16,rim);cv_rect(x+10,y,1,16,rim);
-    if(l==5){cv_line(x+7,4,x+3,10,c);cv_line(x+3,10,x+7,9,c);cv_line(x+7,9,x+3,15,c);}
-    else if(l==6)cv_rect(x+3,9,5,1,rim);
-    else for(k=0;k<l;k++)cv_rect(x+2,14-3*k,7,2,c);
-    return x;
-}
-#ifdef UI_PROP
 static int ptext_w(const char *s,unsigned face){int w=0;for(;*s;s++)w+=panel_adv[face+glyph_index(*s)];return w;}
 static void batt_h(int x,int y){                 /* horizontal: 18 x 9 with the nub on the right */
   uint32_t l=batt_shown();
@@ -1285,11 +1278,8 @@ static void batt_h(int x,int y){                 /* horizontal: 18 x 9 with the 
 /* One row, nothing squeezed: page on the left, status on the right, engine in between. */
 static void header_row(const char *pg,const char *eng,const char *slot,const char *mode,int hold){
   int right=234;
-#if UI_PROP==2
-  batt_h(right-20,4);right-=27;
-#endif
-  unsigned fm=UI_PROP>=2?0:95;int wm=ptext_w(mode,fm);panel_text(-(right-wm),fm?0:2,mode,silver,240,fm);right-=wm+8;
-  unsigned fs=UI_PROP>=2?0:95;int ws=ptext_w(slot,fs);panel_text(-(right-ws),fs?0:2,slot,silver,240,fs);right-=ws+8;
+  unsigned fm=0;int wm=ptext_w(mode,fm);panel_text(-(right-wm),fm?0:2,mode,silver,240,fm);right-=wm+8;
+  unsigned fs=0;int ws=ptext_w(slot,fs);panel_text(-(right-ws),fs?0:2,slot,silver,240,fs);right-=ws+8;
   if(hold){int wh=ptext_w("HOLD",0);panel_text(-(right-wh),2,"HOLD",gold,240,0);right-=wh+8;}
   unsigned fp=95,fe=95;int wp=ptext_w(pg,fp),we=ptext_w(eng,fe),room=right-6-8;
   if(wp+we>room){fp=0;wp=ptext_w(pg,fp);}
@@ -1298,7 +1288,6 @@ static void header_row(const char *pg,const char *eng,const char *slot,const cha
   int gap_l=6+wp+8, cx=(gap_l+right)/2;if(cx-we/2<gap_l)cx=gap_l+we/2;
   panel_text(cx,fe?0:2,eng,gold,we+1,fe);
 }
-#endif
 static void draw(void) {
   if(intro && fm1_ms-intro_start<INTRO_END_MS){boot_draw(fm1_ms-intro_start);return;}intro=0;
   static const char *const modes[] = {"STOP", "REC", "DUB", "PLAY"};
@@ -1439,18 +1428,10 @@ static void draw(void) {
     cv_rect(0,41,240,62,ink);
     lettering(120,46,program_notice,gold,ink); lettering(120,76,title,silver,ink);
   }
-#if UI_PROP==3
   if(!naming){cv_rect(211,1,28,13,ink);batt_h(214,3);}   /* top right of the screen, on a dark tab */
-#endif
   cv_blit(0, 0);
   cv_begin(240, 94, ink);
   char slot_id[]={'P','0'+(program+1)/10,'0'+(program+1)%10,0};
-#ifndef UI_PROP
-  batt_draw();
-  panel_text(latch_armed?84:98,0,engines[knob[SOUND][2]],gold,latch_armed?54:64,95);
-  panel_text(198,0,(reverse && t==HOLD)?"REV":modes[t],silver,38,0);
-  if(latch_armed)panel_text(158,0,"HOLD",gold,32,0);
-#endif
   if(naming){
     lettering(120,20,"PRESETS selects destination",silver,ink);
     const char *labels[]={"CURSOR","LETTER","DICE","DELETE"};
@@ -1461,21 +1442,11 @@ static void draw(void) {
     }
     cv_blit(0,146);return;
   }
-#ifdef UI_PROP
   header_row(page==ART && !knob[SOUND][2]?"SEL TOUCH":page==ARP && !knob[SOUND][2]?"ARP RATE":pages[page],engines[knob[SOUND][2]],slot_id,(reverse && t==HOLD)?"REV":modes[t],latch_armed);
-  int start=6,end=UI_PROP==1?208:234;
-  if(UI_PROP==1)batt_h(214,16);
+  int start=6,end=234;
   int width=length?position*(unsigned)(end-start)/length:0;
   cv_rect(start,19,end-start,2,metal);
   cv_rect(start,19,width,2,gold);
-#else
-  panel_text(latch_armed?125:148,0,slot_id,silver,latch_armed?23:30,0);
-  panel_text(latch_armed?25:31,0,page==ART && !knob[SOUND][2]?"SEL TOUCH":page==ARP && !knob[SOUND][2]?"ARP RATE":pages[page],gold,latch_armed?48:60,0);
-  int start=6;
-  int width=length?position*(234u-start)/length:0;
-  cv_rect(start,19,234-start,2,metal);
-  cv_rect(start,19,width,2,gold);
-#endif
   for (int k = 0; k < 4; k++) {
     if ((page == OFF_TAPE || page == LIGHTS || page == HEAD2) && k > 0) break;
     if ((page == SCALE || page == BT || page==ERASE || page==SPEED || (page==TIMBRE && !four_timbre()) || (page==MOTION || page==ROUTE)) && k >= 2) break;
