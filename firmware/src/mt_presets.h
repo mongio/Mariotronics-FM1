@@ -101,6 +101,7 @@ static void capture_patch(Patch *p) {
     p->values[4][2]=knob[MOTION][0]*81+knob[TIMBRE][0]*9+knob[TIMBRE][1];
     p->values[4][3]=knob[ARP][0]*16+knob[ARP][1]-3;
     p->values[12][2]=knob[ARP][2];p->values[12][3]=knob[ARP][3];
+    if(voice_kind()==AIR){p->values[1][0]=0;p->values[12][1]=128+knob[TIMBRE][2]*9+knob[TIMBRE][3];}
     if(knob[SOUND][2]==1)p->values[2][2]=128+knob[TIMBRE][2]*9+knob[TIMBRE][3];
     if(knob[SOUND][2]==1)for(int k=0;k<4;k++)p->values[11][k]=knob[NOTE_FX][k];
   }
@@ -123,6 +124,7 @@ static void apply_patch(const Patch *p) {
       for(int k=0;k<4;k++)knob[NOTE_FX][k]=knob[ARP][k];
       knob[ARP][0]=0;knob[ARP][1]=6;knob[ARP][2]=64;knob[ARP][3]=15;
     }
+    if(knob[SOUND][2]==3 && !knob[SOUND][0] && p->values[12][1]>=128 && p->values[12][1]<=208){knob[SOUND][0]=4;int n=p->values[12][1]-128;knob[TIMBRE][2]=n/9;knob[TIMBRE][3]=n%9;}
     if(p->vibrato&16){
       knob[TIMBRE][0]=p->values[4][2]%81/9;knob[TIMBRE][1]=p->values[4][2]%9;
       knob[MOTION][0]=bound(p->values[4][2]/81,0,2);knob[MOTION][1]=(p->vibrato>>1)&7;

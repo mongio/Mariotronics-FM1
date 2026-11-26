@@ -29,7 +29,7 @@ static int valid_backup(void) {
       if((pg==SCALE && k>=2)||(pg==OFF_TAPE && k>0))continue;
       if(pg==ART && p->values[1][2]==1 && k==2 && v>=128 && v<=208)continue;
       if(pg==ARP && !k && p->values[1][2]>=2)hi=4;
-      if(pg==SOUND && k==0 && p->values[1][2])hi=p->values[1][2]==1?8:3;
+      if(pg==SOUND && k==0 && p->values[1][2])hi=p->values[1][2]==1?8:(p->values[1][2]==3?4:3);
       if(!(p->vibrato&128) && ((pg==SOUND && k==2)||(pg==HOME && k==0)))continue;
       if(v<minimum[pg][k] || v>hi)return 0;
     }

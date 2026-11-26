@@ -147,3 +147,23 @@ static void motion_view(void){
   }
   lettering(120,120,kind<=BRIGHT?"BODY RESPONSE":"MODULATION",silver,0);
 }
+
+static void air_display(void){
+    lettering(120,2,"AIR / FIELD RECEIVER",gold,0);
+    cv_rect(18,28,204,50,RGB(208,183,131));
+    for(int i=0;i<=10;i++)cv_line(27+18*i,36,27+18*i,36+(i%5?4:9),ink);
+    cv_line(120,76,28+air_level*180/255,38,RGB(133,46,29));
+    char status[20];
+    if(air_started<0)lettering(120,82,"NO RF CALIBRATION",silver,0);
+    else if(air_pick>=0 && air_pick<(int)air_count){
+        AirStation *s=&air_stations[air_pick];
+        lettering(93,82,s->name[0]?s->name:"HIDDEN",silver,0);
+        if(fm1_ms-s->last>3000)lettering(183,82,"LOST",silver,0);
+        else {status[0]='-';number(status+1,-s->dbm);lettering(183,82,status,gold,0); }
+    }else lettering(120,82,"SCANNING",silver,0);
+#if defined(GRANA_WEB) || defined(DINGHY_HOST)
+    lettering(120,108,air_frozen?"DEMO / FROZEN":"DEMO / SIMULATED RF",gold,0);
+#else
+    lettering(120,108,air_frozen?"FROZEN":air_locked?"TUNED":"AUTO SCAN",gold,0);
+#endif
+}

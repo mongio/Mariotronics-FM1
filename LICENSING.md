@@ -40,3 +40,5 @@ owners. VIRGO is not made or endorsed by them.
   `io/midi/midi_ble.c`, by way of GRANA.
 - `firmware/src/virgo_smc.c`: the SMC-Mixer's DAW mode, after Hortator's `smc.c` (DeadActive, GPL-3.0-only).
 
+
+AIR Lab uses fm1_wifi.h from hugelton/felucca-bsp (fdd709fd0066b878b03c144776404d63811db13e), dual GPL-3.0-only or MPL-2.0, and fm1_wifi_wlc.h from charlesvestal/fm1-base (30397702339c2ecb8fe20aa89e4cda0b4975f0d8), Apache-2.0. See the notices in both headers and APACHE-2.0.txt.

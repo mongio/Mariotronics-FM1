@@ -29,7 +29,7 @@
 #endif
 static int16_t tape[CAPACITY] POOLMEM;
 enum { STOP, RECORD, DUB, HOLD };
-enum { SINGING = 4, HOLLOW = 5, PIANO = 6, BRIGHT, GLASS_BELL, TAPE_CHOIR, RHODES, BOWED, ORGAN, REED, REED_ORGAN, HARMONIUM, BEATING, SUB_DRONE, VEIL, FIFTH, EVENING, DUSK, TIDAL };
+enum { SINGING = 4, HOLLOW = 5, PIANO = 6, BRIGHT, GLASS_BELL, TAPE_CHOIR, RHODES, BOWED, ORGAN, REED, REED_ORGAN, HARMONIUM, BEATING, SUB_DRONE, VEIL, FIFTH, EVENING, DUSK, TIDAL, AIR };
 enum { HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, MIDI, BT, ARP, OFF_TAPE, LIGHTS, CHARACTER, EQ, FILTER, HEAD2, PICK_ART, ERASE, SPEED, TIMBRE, NOTE_FX, MOTION, PAGE_COUNT };
 static const char *const pages[] = {"TAPE", "INSTRUMENT", "PHRASING", "FUZZ", "SCALES", "WAH", "AMP", "PLATE", "ENV","COMP","LFO","MIDI","BLE MIDI","ARP","OFF-TAPE","LIGHTS","TAPE CHAR","EQ","FILTER","HEAD 2","ARP PICK","ERASE","SPEED","TIMBRE","NOTE FX","MOTION"};
 static const char *const names[][4] = {{"DELAY", "FDBK", "SEND", "RETURN"},
@@ -60,14 +60,14 @@ static int scale_note(int note) {
   return note;
 }
 static const char *const engines[] = {"FRIPP","ENO","RILEY","RADIGUE"};
-static const char *const drones[]={"BEATING","SUB","VEIL","FIFTH"};
+static const char *const drones[]={"BEATING","SUB","VEIL","FIFTH","AIR RF"};
 static const char *const patterns[]={"OFF","CLIMB","FOLD","PHASE","ORBIT"};
 static const char *const timbre_labels[][4]={
   {"HAMMER","BODY","DAMPER","RESON."},{"HAMMER","BODY","DAMPER","RESON."},{"STRIKE","ALLOY"},{"WAVE","AIR"},
   {"TINE","PICKUP"},{"BOW","GLASS"},{"4 FT","2 2/3 FT"},{"EDGE","BREATH"},
   {"4 FT","MIXTURE"},{"BELLOWS","AIR"},{"BEAT","COLOR"},{"BEAT","COLOR"},
-  {"BEAT","COLOR"},{"BEAT","COLOR"},{"BEAT","COLOR","DRIFT","SHAPE"},{"VOWEL","BLEND","DRIFT","AIR"},{"NOISE","TONE","SWELL","DRIFT"}};
-static int voice_kind(void) { if(knob[SOUND][2]==1 && knob[SOUND][0]>=6)return EVENING+knob[SOUND][0]-6;return (knob[SOUND][2]==3 ? BEATING : knob[SOUND][2]==2 ? ORGAN : knob[SOUND][2]==1 ? PIANO : SINGING) + knob[SOUND][0]; }
+  {"BEAT","COLOR"},{"BEAT","COLOR"},{"BEAT","COLOR","DRIFT","SHAPE"},{"VOWEL","BLEND","DRIFT","AIR"},{"NOISE","TONE","SWELL","DRIFT"},{"TUNE","INERTIA","BEAT","NOISE"}};
+static int voice_kind(void) { if(knob[SOUND][2]==3 && knob[SOUND][0]==4)return AIR;if(knob[SOUND][2]==1 && knob[SOUND][0]>=6)return EVENING+knob[SOUND][0]-6;return (knob[SOUND][2]==3 ? BEATING : knob[SOUND][2]==2 ? ORGAN : knob[SOUND][2]==1 ? PIANO : SINGING) + knob[SOUND][0]; }
 static int four_timbre(void){int k=voice_kind();return k==PIANO || k==BRIGHT || k>=EVENING;}
 static int page, octave;
 static volatile int vib_on = 1;
@@ -99,6 +99,7 @@ static String strings[4];
 static int sinus(unsigned phase);
 static void update_pitch(String *s);
 #include "mt_acoustic.h"
+#include "mt_air.h"
 static unsigned char held_notes[128], held_counts[128];
 static int phrase_enabled;
 static int held_size;
@@ -370,7 +371,7 @@ static int envelope_tick(String *s) {
   s->level=s->env_q8>>8;
   return s->level;
 }
-static const char *const motion_titles[]={"SOUNDBOARD","SOUNDBOARD","SHIMMER","CHORUS","TREMOLO","SHIMMER","ROTARY","AIR PULSE","ROTARY","BELLOWS","SLOW FADE","SLOW FADE","SLOW FADE","SLOW FADE","SHIMMER","CHORUS","AIR PULSE"};
+static const char *const motion_titles[]={"SOUNDBOARD","SOUNDBOARD","SHIMMER","CHORUS","TREMOLO","SHIMMER","ROTARY","AIR PULSE","ROTARY","BELLOWS","SLOW FADE","SLOW FADE","SLOW FADE","SLOW FADE","SHIMMER","CHORUS","AIR PULSE","AIR FLOW"};
 static int motion_sample(String *s,int sample){
   int depth=knob[MOTION][1];
   if(!depth)return sample;
@@ -389,6 +390,15 @@ static int string_tick(String *s) {
     return 0;
   int level=envelope_tick(s);
   if(!s->active) return 0;
+  if(s->kind==AIR){
+    if(!(s->pitch_clock++&15))update_pitch(s);
+    s->phase+=s->increment;
+    s->sample_wave+=s->increment+(unsigned)(air_level*knob[TIMBRE][2])*230u;
+    int voice=16*sinus(s->phase)+12*sinus(s->sample_wave);
+    int grain=(rnd()/256)*air_noise*knob[TIMBRE][3]/128;
+    s->neck+=(grain-s->neck)/(3+(255-air_level)/16);
+    return ((voice+s->neck)*s->strength/4096)*level/32768;
+  }
   if(s->kind>=EVENING)return motion_sample(s,pad_tick(s))*level/32768;
   if(s->kind>=ORGAN) {
     if (!(s->pitch_clock++ & 15)) update_pitch(s);
@@ -1152,7 +1162,8 @@ static void draw(void) {
   static const char *const modes[] = {"STOP", "REC", "DUB", "HOLD"};
   unsigned t = transport;
   cv_begin(240, 146, 0);
-  if(page==SCALE)fretboard();
+  if(voice_kind()==AIR && (page==HOME || page==TIMBRE || page==ARP))air_display();
+  else if(page==SCALE)fretboard();
   else if(page==MOTION)motion_view();
   else if(page==TIMBRE || page==NOTE_FX || page==HEAD2)instrument_diagram();
   else if(page==ARP && knob[SOUND][2])pattern_view();
@@ -1301,7 +1312,7 @@ static void draw(void) {
     if ((page == OFF_TAPE || page == LIGHTS || page == HEAD2) && k > 0) break;
     if ((page == SCALE || page == BT || page==ERASE || page==SPEED || (page==TIMBRE && !four_timbre()) || page==MOTION) && k >= 2) break;
     int x = (page == SCALE || page == BT || page==ERASE || page==SPEED || (page==TIMBRE && !four_timbre()) || page==MOTION) ? 60 + 120 * k : 30 + 60 * k;
-    int v = knob[page][k], lo = minimum[page][k], hi = page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?8:3):maximum[page][k];
+    int v = knob[page][k], lo = minimum[page][k], hi = page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?8:(knob[SOUND][2]==3?4:3)):maximum[page][k];
     if(page==SPEED && !k && !knob[SPEED][1])hi=3;
     vintage_knob(x,40,v-lo,hi-lo);
     char val[8];
@@ -1490,7 +1501,8 @@ static void set_control(int k,int v) {
   if(page==CHARACTER && knob[page][k]!=bound(v,0,100)) {
     globals[1+k]=bound(v,0,100); globals_changed=1; light_changed=fm1_ms;
   }
-  knob[page][k]=bound(v,minimum[page][k],page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?8:3):maximum[page][k]);
+  if(page==SOUND && !k && knob[SOUND][2]==3 && knob[SOUND][0]!=4 && v>=4)knob[TIMBRE][0]=0;
+  knob[page][k]=bound(v,minimum[page][k],page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?8:(knob[SOUND][2]==3?4:3)):maximum[page][k]);
   if(knob[SOUND][2] && page==LFO && k<2) knob[ART][3-k]=knob[LFO][k];
   if(knob[SOUND][2] && page==ART && k>=2) knob[LFO][3-k]=knob[ART][k];
 
@@ -1557,7 +1569,8 @@ static void app_step(void) {
   if (edge & (1u << BTN_SEL)) page = page==ART ? SCALE : ART;
   if (edge & (1u << BTN_GLO)) page = page==CHARACTER ? SPEED : page==SPEED ? ERASE : page==ERASE ? MIDI : page==MIDI ? BT : page==BT ? LIGHTS : CHARACTER;
   if(edge & (1u<<BTN_ARP)) {
-    if(knob[SOUND][2]==0 && page==ARP){page=PICK_ART;}
+    if(voice_kind()==AIR){air_freeze();page=TIMBRE;}
+    else if(knob[SOUND][2]==0 && page==ARP){page=PICK_ART;}
     else if(knob[SOUND][2]==0 && page==PICK_ART){page=ARP;}
     else if(knob[SOUND][2])page=ARP;
     else { knob[ARP][0]=!knob[ARP][0]; page=ARP; }
@@ -1630,6 +1643,7 @@ static void app_step(void) {
   if(bt_lost){bt_lost=0;for(int ch=0;ch<16;ch++)for(int n=0;n<128;n++)midi_input(1,128+ch,n,0);}
 #endif
   if(!knob[MIDI][2] || (last_tick && fm1_ms-last_tick>1000)){last_tick=ticks=beat_ms=0;}
+  air_step(voice_kind()==AIR,fm1_ms);
   update_leds(keys);
   if(globals_changed && fm1_ms-light_changed>=600u) {
     if(!settings_save(globals,sizeof globals)) globals_changed=0;
@@ -1660,6 +1674,9 @@ static void web_bank_changed(void) {}
 static uint32_t web_state(void) {
   return ((naming?destination:program) << 16) | (knob[SOUND][2] << 12) | (naming << 11) | (page & 15) | (transport << 4) | ((knob[ARP][0]!=0) << 8) | (vib_on << 9) | (reverse << 10);
 }
+WEB_EXPORT("rf_meter") int web_rf_meter(void){return air_level;}
+WEB_EXPORT("rf_count") int web_rf_count(void){return air_count;}
+WEB_EXPORT("rf_frozen") int web_rf_frozen(void){return air_frozen;}
 WEB_EXPORT("voice") int web_voice(void){return voice_kind();}
 WEB_EXPORT("page") int web_page(void){return page;}
 WEB_EXPORT("idle_preview") void web_idle_preview(void){intro=0;draw();}

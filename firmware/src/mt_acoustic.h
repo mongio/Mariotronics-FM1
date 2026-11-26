@@ -33,7 +33,7 @@ static int board_tick(int excitation,int resonance){
     if(excitation)remaining=88200;
     else if(!remaining)return 0;
     else remaining--;
-    static int16_t board[3][512];
+    static int16_t board[3][512] POOLMEM;
     static unsigned index;
     static const unsigned periods[]={409,217,131};
     int wet=0;
