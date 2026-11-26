@@ -1288,8 +1288,8 @@ static void header_row(const char *pg,const char *eng,const char *slot,const cha
 #if UI_PROP==2
   batt_h(right-20,4);right-=27;
 #endif
-  unsigned fm=UI_PROP==2?0:95;int wm=ptext_w(mode,fm);panel_text(-(right-wm),fm?0:2,mode,silver,240,fm);right-=wm+8;
-  unsigned fs=UI_PROP==2?0:95;int ws=ptext_w(slot,fs);panel_text(-(right-ws),fs?0:2,slot,silver,240,fs);right-=ws+8;
+  unsigned fm=UI_PROP>=2?0:95;int wm=ptext_w(mode,fm);panel_text(-(right-wm),fm?0:2,mode,silver,240,fm);right-=wm+8;
+  unsigned fs=UI_PROP>=2?0:95;int ws=ptext_w(slot,fs);panel_text(-(right-ws),fs?0:2,slot,silver,240,fs);right-=ws+8;
   if(hold){int wh=ptext_w("HOLD",0);panel_text(-(right-wh),2,"HOLD",gold,240,0);right-=wh+8;}
   unsigned fp=95,fe=95;int wp=ptext_w(pg,fp),we=ptext_w(eng,fe),room=right-6-8;
   if(wp+we>room){fp=0;wp=ptext_w(pg,fp);}
@@ -1439,6 +1439,9 @@ static void draw(void) {
     cv_rect(0,41,240,62,ink);
     lettering(120,46,program_notice,gold,ink); lettering(120,76,title,silver,ink);
   }
+#if UI_PROP==3
+  if(!naming){cv_rect(211,1,28,13,ink);batt_h(214,3);}   /* top right of the screen, on a dark tab */
+#endif
   cv_blit(0, 0);
   cv_begin(240, 94, ink);
   char slot_id[]={'P','0'+(program+1)/10,'0'+(program+1)%10,0};
