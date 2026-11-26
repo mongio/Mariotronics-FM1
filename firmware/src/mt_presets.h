@@ -101,6 +101,7 @@ static void capture_patch(Patch *p) {
     p->values[4][2]=knob[MOTION][0]*81+knob[TIMBRE][0]*9+knob[TIMBRE][1];
     p->values[4][3]=knob[ARP][0]*16+knob[ARP][1]-3;
     p->values[12][2]=knob[ARP][2];p->values[12][3]=knob[ARP][3];
+    if(knob[SOUND][2]==1)p->values[2][2]=128+knob[TIMBRE][2]*9+knob[TIMBRE][3];
     if(knob[SOUND][2]==1)for(int k=0;k<4;k++)p->values[11][k]=knob[NOTE_FX][k];
   }
 }
@@ -116,8 +117,9 @@ static void apply_patch(const Patch *p) {
     knob[PICK_ART][k]=(p->vibrato&64)?bound(p->values[k<2?4:12][2+k%2],0,maximum[PICK_ART][k]):defaults[k];
   if(!(p->vibrato&32) && !knob[SOUND][2]){knob[ART][2]=40;knob[ART][3]=9;}
   if(knob[SOUND][2]){
-    knob[TIMBRE][0]=knob[TIMBRE][1]=4;knob[MOTION][0]=1;knob[MOTION][1]=0;
+    knob[TIMBRE][0]=knob[TIMBRE][1]=knob[TIMBRE][2]=knob[TIMBRE][3]=4;knob[MOTION][0]=1;knob[MOTION][1]=0;
     if(knob[SOUND][2]==1){
+      if(p->values[2][2]>=128 && p->values[2][2]<=208){int extra=p->values[2][2]-128;knob[TIMBRE][2]=extra/9;knob[TIMBRE][3]=extra%9;knob[ART][2]=knob[LFO][1];}
       for(int k=0;k<4;k++)knob[NOTE_FX][k]=knob[ARP][k];
       knob[ARP][0]=0;knob[ARP][1]=6;knob[ARP][2]=64;knob[ARP][3]=15;
     }
@@ -147,7 +149,7 @@ static void switch_engine(int next) {
   if(!working_valid[next] && !next) {knob[SOUND][0]=0; knob[ART][2]=40; knob[ART][3]=9;}
   if(!working_valid[next] && next) {
     knob[ART][2]=knob[LFO][1];knob[ART][3]=knob[LFO][0];
-    knob[TIMBRE][0]=knob[TIMBRE][1]=4;knob[MOTION][0]=1;knob[MOTION][1]=0;
+    knob[TIMBRE][0]=knob[TIMBRE][1]=knob[TIMBRE][2]=knob[TIMBRE][3]=4;knob[MOTION][0]=1;knob[MOTION][1]=0;
     knob[NOTE_FX][0]=0;knob[NOTE_FX][1]=10;knob[NOTE_FX][2]=48;knob[NOTE_FX][3]=0;
     knob[ARP][0]=0;knob[ARP][1]=10;knob[ARP][2]=48;knob[ARP][3]=0;
     knob[ENV][0]=0;knob[ENV][1]=44;knob[ENV][2]=85;knob[ENV][3]=35;

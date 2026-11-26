@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 
 rate = 16000
-frames = 43520
+frames = 28544
 roots = [38, 47, 56, 65, 74, 83]
 t = np.arange(frames) / rate
 bank = []

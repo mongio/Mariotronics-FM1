@@ -11,7 +11,7 @@ EDIT opens Instrument. LFO adjusts rate, depth, wait and rise. Press LFO again o
 On Linux x86-64, use the JieLi toolchain and AC79 SDK for the firmware, and clang with wasm-ld for the emulator. Set JIELI_TOOLCHAIN and AC79_SDK before building.
 
 ```sh
-./build.sh --release 1.7
+./build.sh --release 1.18
 clang --target=wasm32 -O2 -ffreestanding -nostdlib -fno-builtin -DGRANA_WEB -Ifirmware/src -Ifirmware/gen -Wl,--no-entry -Wl,--export-memory -Wl,-z,stack-size=262144 -Wl,--initial-memory=16777216 -o web/mariotronics.wasm firmware/src/mariotronics.c
 python3 web/make_mariotronics.py
 ```
@@ -20,7 +20,7 @@ The FM-1 platform, USB/TRS MIDI and BLE central derive from VIRGO, GRANA, Felucc
 
 **Off-Tape Monitor.** Press FX until OFF-TAPE appears. K1 sets the level (0–100%, default 25%). In REC and DUB, the first head reads the newly written tape after 180 ms. Its level affects the monitor mix feeding the final plate.
 
-**Panel lights.** GLO cycles through TAPE CHARACTER, TAPE SPEED, MIDI, BLE MIDI and LIGHTS. On LIGHTS, K1 selects OFF, HALF or FULL idle key backlight (default FULL). A held key lights at peak brightness. REC flashes while recording or overdubbing. PLAY stays lit while the tape moves.
+**Panel lights.** GLO cycles through TAPE CHARACTER, TAPE SPEED, ERASE HEAD, MIDI, BLE MIDI and LIGHTS. On LIGHTS, K1 selects OFF, HALF or FULL idle key backlight (default FULL). A held key lights at peak brightness. REC flashes while recording or overdubbing. PLAY stays lit while the tape moves.
 
 **Presets.** Turn PRESETS to recall P01–P64. Each group of eight combines Singing, Hollow, Velvet, Glass, Fuzz, Reed, Copper and Wire with a different tape and articulation setup: Tape, Swell, Dusk, Echo, Bloom, Pulse, Mist or Drift. Press SAVE to open SAVE. K1 moves the cursor, K2 edits the character, K3 generates a tape-inspired name, and K4 left erases a character. K4 right selects Delete Preset. Turn PRESETS to choose the destination. Press SAVE to commit or HOME to cancel. Tap SEQ to toggle forward/reverse playback and show the decks. Tap REC during overdub for HOLD. MIDI Program Change 0–63 recalls the same slots. Presets store instrument voice, articulation, scale, effects, tape controls and arpeggiator settings. Recorded audio and global controls are separate. The FM-1 stores edits in flash and the editor stores its own bank in the browser. Startup recalls P01.
 
@@ -37,3 +37,7 @@ EDIT shows a triggered pre-effects voice scope. TAPE CHARACTER shows output VU a
 In 1.5, EDIT adds Rhodes and Bowed Glass to ENO, and Reed Organ and Harmonium Drone to RILEY. ENO acoustic and bright pianos use two velocity layers rendered from coupled stiff strings and hammer contact. GLO has cream vintage meter faces. Moving HOME K1 during internal tape playback bends the return. From HOME turn SELECT left once to reach ERASE. K1 ALL keeps the 1.2-second whole-tape erase. For RANGE arm K2, then hold REC over the moving tape and release to disarm.
 
 **Tape Speed.** On the second GLOBAL page, K1 changes the transport speed. K2 selects STEP (4.75, 9.5, 19 and 38 cm/s) or VAR for fine adjustment. At 9.5 cm/s a loop recorded at 19 cm/s plays an octave lower and lasts twice as long. The live instrument keeps its tuning.
+
+## Version 1.18
+
+ENO Acoustic and Bright Piano combine a velocity-layered hammer strike with two coupled fractional-delay strings and a shared resonant soundboard. MIDI CC64 operates the sustain pedal. In EDIT, adjust Hammer, Body, Damper and Resonance. The three new ENO pads follow Bowed Glass in the voice menu. Each has four live controls in EDIT. GLO now includes Erase Head after Tape Speed.

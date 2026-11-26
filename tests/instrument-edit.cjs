@@ -34,6 +34,12 @@ async function boot(file, bank) {
     b.press(6); assert.deepEqual(b.params().slice(0,2), [2,6]);
     if (alg === 1) { b.press(6); assert.deepEqual(b.params(), [1,13,73,23]); }
   }
+  for(const voice of [0,6,7,8]){
+    const a=await boot(file);a.engine(1);a.press(6);a.values([voice]);a.press(6);
+    a.values([6,3,8,1]);a.press(9);a.press(9);
+    const b=await boot(file,a.store);b.press(6);assert.equal(b.w.param(0),voice);
+    b.press(6);assert.deepEqual(b.params(),[6,3,8,1]);
+  }
   if (process.argv[3]) {
     const old = await boot(process.argv[3]);
     old.engine(1); old.press(10); old.values([1,14,71,63]); old.press(9); old.press(9);

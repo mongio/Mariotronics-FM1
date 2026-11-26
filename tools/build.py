@@ -288,9 +288,9 @@ def main():
     a = ap.parse_args()
     name = "virgo.fwsc"
     if a.release:                   # one digit each: the identity has room for two (X.Y; a .Z only in the text)
-        m = re.fullmatch(r"(\d)\.(\d)(\.\d)?(-[A-Za-z0-9]+)?", a.release)
-        if not m:
-            raise SystemExit(f"--release {a.release}: use X.Y, X.Y.Z or X.Y-suffix, one digit each")
+        m = re.fullmatch(r"(\d)\.(\d|18)(\.\d)?(-[A-Za-z0-9]+)?", a.release)
+        if not m or (len(m[2])>1 and a.release!="1.18"):
+            raise SystemExit(f"--release {a.release}: use 1.18, X.Y, X.Y.Z or X.Y-suffix, one digit each")
         PRODUCT = "FM-1_" + str(840 + 10*int(m[1]) + int(m[2]))
         VERSION = m[1] + "." + m[2] + (m[3] or "") + (" BT" if a.bt else "")
         name = f"mariotronics-{a.release}{'-bluetooth' if a.bt else ''}.fwsc"
