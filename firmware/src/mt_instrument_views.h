@@ -79,6 +79,26 @@ static void modular_deck(unsigned clock){
   for(int i=0;i<5;i++)cv_rect(171+11*i,96,7,9,silver);
   lettering(81,123,"ARP 2500",gold,0);lettering(198,123,"TAPE",silver,0);
 }
+#ifdef UI_PROP
+static void pattern_view(void){
+  static const unsigned char paths[][8]={{0,1,2,3,4,5,6,7},{0,1,2,3,2,1,0,1},{0,2,1,3,1,4,2,5},{0,3,1,4,2,5,1,3}};
+  static unsigned glow[8];                       /* each step fades after it plays */
+  int mode=knob[ARP][0], now=mode && phrase_size?(int)((phrase_step+7)&7):-1;
+  lettering(120,9,patterns[mode],mode?gold:silver,0);
+  cv_rect(14,112,212,1,RGB(40,42,38));
+  for(int i=0;i<8;i++){
+    int h=8+9*paths[bound(mode-1,0,3)][i], x=19+26*i;
+    if(i==now)glow[i]=255;else if(glow[i]>12)glow[i]-=12;else glow[i]=0;
+    unsigned g=glow[i];
+    uint16_t body=RGB(60+(247-60)*g/255,62+(187-62)*g/255,58+(88-58)*g/255);
+    if(!mode){cv_rect(x,112-h,18,1,metal);cv_rect(x,112-h,1,h,metal);cv_rect(x+17,112-h,1,h,metal);continue;}
+    if(g>200)cv_rect(x-2,110-h,22,h+2,RGB(90,66,30));
+    cv_rect(x,112-h,18,h,body);
+    cv_rect(x,112-h,18,2,g?RGB(255,226,160):silver);
+    disc(x+9,121,2,i==now?gold:RGB(50,52,48));
+  }
+}
+#else
 static void pattern_view(void){
   static const unsigned char paths[][8]={{0,1,2,3,4,5,6,7},{0,1,2,3,2,1,0,1},{0,2,1,3,1,4,2,5},{0,3,1,4,2,5,1,3}};
   int mode=knob[ARP][0];
@@ -88,6 +108,7 @@ static void pattern_view(void){
     cv_rect(19+26*i,112-h,18,h,mode && phrase_size && ((phrase_step+7)&7)==i?gold:metal);
   }
 }
+#endif
 static void instrument_diagram(void){
   int kind=voice_kind(),a=knob[TIMBRE][0],b=knob[TIMBRE][1];
   if(page==HEAD2 || page==NOTE_FX){
@@ -156,6 +177,41 @@ static void motion_view(void){
   lettering(120,120,kind<=BRIGHT?"BODY RESPONSE":"MODULATION",silver,0);
 }
 
+#ifdef UI_PROP
+static void air_display(void){
+  static int needle;
+  lettering(120,2,"FIELD RECEIVER",gold,0);
+  uint16_t face=RGB(214,190,138), print=RGB(70,52,30);
+  cv_rect(16,24,208,74,face);cv_rect(16,24,208,1,RGB(240,226,190));cv_rect(16,97,208,1,RGB(150,128,88));
+  int target=air_level*256+(rnd()&255)*air_noise/2;     /* ballistics: quick rise, slow fall */
+  needle+=(target-needle)/(target>needle?3:9);
+  for(int i=0;i<=20;i++){                               /* arc scale, -45..+45 degrees */
+    unsigned a=0xE0000000u+(unsigned)i*0x03333333u;
+    int s=sinus(a),c=sinus(a+0x40000000u),r0=i%5?58:52;
+    cv_line(120+s*r0/127,96-c*r0/127,120+s*64/127,96-c*64/127,i>=16?RGB(170,50,30):print);
+  }
+  { unsigned a=0xE0000000u+(unsigned)(bound(needle/256,0,255))*0x00404040u;
+    int s=sinus(a),c=sinus(a+0x40000000u);
+    cv_line(120,96,120+s*66/127,96-c*66/127,RGB(150,40,24)); }
+  cv_rect(16,88,208,10,RGB(58,44,30));cv_rect(16,88,208,1,RGB(120,96,64));
+  lettering(40,26,"RF",print,0);
+  for(int ch=1;ch<=13;ch++){                            /* activity per channel, the scanner's place */
+    if(air_heat[ch]>0)air_heat[ch]-=1;
+    int h=bound(air_heat[ch]*16/60,0,16),x=22+15*(ch-1);
+    cv_rect(x,117-h,11,h,ch==(int)air_channel?gold:metal);
+    cv_rect(x,118,11,1,RGB(40,42,38));
+    if(ch==(int)air_channel)cv_rect(x+3,120,5,2,gold);
+  }
+  char status[20];
+  if(air_started<0)lettering(120,126,"NO RF CALIBRATION",silver,0);
+  else if(air_pick>=0 && air_pick<(int)air_count){
+    AirStation *s=&air_stations[air_pick];
+    lettering(90,126,s->name[0]?s->name:"HIDDEN",silver,0);
+    if(fm1_ms-s->last>3000)lettering(190,126,"LOST",silver,0);
+    else {status[0]='-';number(status+1,-s->dbm);lettering(190,126,status,gold,0);}
+  }else lettering(120,126,air_frozen?"FROZEN":"SCANNING",silver,0);
+}
+#else
 static void air_display(void){
     lettering(120,2,"FIELD RECEIVER",gold,0);
     cv_rect(18,28,204,50,RGB(208,183,131));
@@ -175,3 +231,4 @@ static void air_display(void){
     lettering(120,108,air_frozen?"FROZEN":air_locked?"TUNED":"AUTO SCAN",gold,0);
 #endif
 }
+#endif

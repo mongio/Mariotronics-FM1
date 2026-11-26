@@ -996,6 +996,12 @@ static void panel_text(int x,int y,const char *s,uint16_t fg,int limit,unsigned 
   int width=0;
   for(const char *p=s;*p;p++)width+=panel_adv[face+glyph_index(*p)];
   if(!width)return;
+#ifdef UI_PROP
+  if(width>limit && face){            /* too wide: the small face before any squeezing */
+    int small=0;for(const char *p=s;*p;p++)small+=panel_adv[glyph_index(*p)];
+    if(small<=limit || small<width){face=0;width=small;}
+  }
+#endif
   int out=width<limit?width:limit, left=x<0?-x:x-out/2, pen=0;
   for(;*s;s++){
     unsigned glyph=face+glyph_index(*s),advance=panel_adv[glyph];
@@ -1241,7 +1247,9 @@ static void picking_view(void) {
 /* Battery thresholds and icon adapted from GRANA (grana.c). */
 static uint32_t batt_level(void)
 {
-#if defined(GRANA_WEB) || defined(DINGHY_HOST)
+#if defined(BATT_DEMO)
+    return 3u; /* screenshots */
+#elif defined(GRANA_WEB) || defined(DINGHY_HOST)
     return 6u; /* Unknown: the simulator has no battery ADC. */
 #else
     int32_t b = batt_raw;
@@ -1264,6 +1272,33 @@ static int32_t batt_draw(void)               /* on the header's canvas, right-al
     else for(k=0;k<l;k++)cv_rect(x+2,14-3*k,7,2,c);
     return x;
 }
+#ifdef UI_PROP
+static int ptext_w(const char *s,unsigned face){int w=0;for(;*s;s++)w+=panel_adv[face+glyph_index(*s)];return w;}
+static void batt_h(int x,int y){                 /* horizontal: 18 x 9 with the nub on the right */
+  uint32_t l=batt_shown();
+  uint16_t c=l==2?RGB(240,200,60):l<2?RGB(255,70,60):RGB(80,210,100), rim=l==5?c:RGB(150,146,140);
+  cv_rect(x,y,18,1,rim);cv_rect(x,y+8,18,1,rim);cv_rect(x,y,1,9,rim);cv_rect(x+17,y,1,9,rim);cv_rect(x+18,y+2,2,5,rim);
+  if(l==5){cv_line(x+10,y+1,x+6,y+4,c);cv_line(x+6,y+4,x+11,y+4,c);cv_line(x+11,y+4,x+7,y+7,c);}
+  else if(l==6){for(int k=0;k<4;k++)cv_rect(x+3+k*4,y+4,2,1,rim);}
+  else for(uint32_t k=0;k<l;k++)cv_rect(x+2+4*k,y+2,3,5,c);
+}
+/* One row, nothing squeezed: page on the left, status on the right, engine in between. */
+static void header_row(const char *pg,const char *eng,const char *slot,const char *mode,int hold){
+  int right=234;
+#if UI_PROP==2
+  batt_h(right-20,4);right-=27;
+#endif
+  unsigned fm=UI_PROP==2?0:95;int wm=ptext_w(mode,fm);panel_text(-(right-wm),fm?0:2,mode,silver,240,fm);right-=wm+8;
+  unsigned fs=UI_PROP==2?0:95;int ws=ptext_w(slot,fs);panel_text(-(right-ws),fs?0:2,slot,silver,240,fs);right-=ws+8;
+  if(hold){int wh=ptext_w("HOLD",0);panel_text(-(right-wh),2,"HOLD",gold,240,0);right-=wh+8;}
+  unsigned fp=95,fe=95;int wp=ptext_w(pg,fp),we=ptext_w(eng,fe),room=right-6-8;
+  if(wp+we>room){fp=0;wp=ptext_w(pg,fp);}
+  if(wp+we>room){fe=0;we=ptext_w(eng,fe);}
+  panel_text(-6,fp?0:2,pg,RGB(215,192,159),240,fp);
+  int gap_l=6+wp+8, cx=(gap_l+right)/2;if(cx-we/2<gap_l)cx=gap_l+we/2;
+  panel_text(cx,fe?0:2,eng,gold,we+1,fe);
+}
+#endif
 static void draw(void) {
   if(intro && fm1_ms-intro_start<INTRO_END_MS){boot_draw(fm1_ms-intro_start);return;}intro=0;
   static const char *const modes[] = {"STOP", "REC", "DUB", "PLAY"};
@@ -1406,11 +1441,13 @@ static void draw(void) {
   }
   cv_blit(0, 0);
   cv_begin(240, 94, ink);
+  char slot_id[]={'P','0'+(program+1)/10,'0'+(program+1)%10,0};
+#ifndef UI_PROP
   batt_draw();
   panel_text(latch_armed?84:98,0,engines[knob[SOUND][2]],gold,latch_armed?54:64,95);
   panel_text(198,0,(reverse && t==HOLD)?"REV":modes[t],silver,38,0);
   if(latch_armed)panel_text(158,0,"HOLD",gold,32,0);
-  char slot_id[]={'P','0'+(program+1)/10,'0'+(program+1)%10,0};
+#endif
   if(naming){
     lettering(120,20,"PRESETS selects destination",silver,ink);
     const char *labels[]={"CURSOR","LETTER","DICE","DELETE"};
@@ -1421,12 +1458,21 @@ static void draw(void) {
     }
     cv_blit(0,146);return;
   }
+#ifdef UI_PROP
+  header_row(page==ART && !knob[SOUND][2]?"SEL TOUCH":page==ARP && !knob[SOUND][2]?"ARP RATE":pages[page],engines[knob[SOUND][2]],slot_id,(reverse && t==HOLD)?"REV":modes[t],latch_armed);
+  int start=6,end=UI_PROP==1?208:234;
+  if(UI_PROP==1)batt_h(214,16);
+  int width=length?position*(unsigned)(end-start)/length:0;
+  cv_rect(start,19,end-start,2,metal);
+  cv_rect(start,19,width,2,gold);
+#else
   panel_text(latch_armed?125:148,0,slot_id,silver,latch_armed?23:30,0);
   panel_text(latch_armed?25:31,0,page==ART && !knob[SOUND][2]?"SEL TOUCH":page==ARP && !knob[SOUND][2]?"ARP RATE":pages[page],gold,latch_armed?48:60,0);
   int start=6;
   int width=length?position*(234u-start)/length:0;
   cv_rect(start,19,234-start,2,metal);
   cv_rect(start,19,width,2,gold);
+#endif
   for (int k = 0; k < 4; k++) {
     if ((page == OFF_TAPE || page == LIGHTS || page == HEAD2) && k > 0) break;
     if ((page == SCALE || page == BT || page==ERASE || page==SPEED || (page==TIMBRE && !four_timbre()) || (page==MOTION || page==ROUTE)) && k >= 2) break;
