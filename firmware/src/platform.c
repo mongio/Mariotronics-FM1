@@ -318,6 +318,9 @@ static volatile int32_t master_q12 = 2048;
 static void app_audio(int32_t *out, uint32_t n);
 static void app_main(void);
 static void (*volatile app_audio_p)(int32_t *, uint32_t) = app_audio;   /* 0.6: RAM code is beyond a direct jump from the flash */
+/* 1.20: how much of each 5.8 ms half the render takes, x256 (256 = all of it). Over 100 % the main loop, the USB
+   and the key lights starve, and after 8 s the watchdog restarts the FM-1. The app sheds voices before that. */
+static volatile uint32_t audio_load_q8, audio_load_peak_q8;
 
 void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) */
 {
@@ -327,7 +330,7 @@ void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) 
     fm1_audio_ack_aux(p);
     if (p & FM1_AUDIO_HALF) {
         int32_t *o = &abuf[fm1_audio_free_half() * HALF_WORDS];
-        uint32_t i, b;
+        uint32_t i, b, t0 = FM1_T4_CNT, used;
         for (i = 0; i < HALF_WORDS; i++)
             o[i] = 0;
         uac_render_start();
@@ -341,6 +344,9 @@ void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) 
         for (i = 0; i < HALF_WORDS; i++)
             o[i] <<= 7;
         fm1_audio_ack_half();
+        used = (FM1_T4_CNT - t0) * 256u / (HALF_FRAMES * 1000000u / 44100u * FM1_TICKS_PER_US);
+        audio_load_q8 = used;
+        if (used > audio_load_peak_q8) audio_load_peak_q8 = used;
     }
     in_audio = 0;
 }

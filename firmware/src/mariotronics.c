@@ -1109,7 +1109,22 @@ static AUDIO_FAST void audio_loop(int32_t *out, uint32_t n, AudioBlock *b) {
 }
 static void (*volatile audio_loop_p)(int32_t *, uint32_t, AudioBlock *) = audio_loop;
 static volatile unsigned audio_ready;
+/* 1.20 load governor: above 85 % of the time a block allows, the oldest voice goes; four blocks over 95 %
+   turn off the ensemble until the load is back under 70 %. A click is better than a frozen, restarting FM-1. */
+static unsigned governor_hits, governor_fx_off;
+static void load_governor(void){
+#if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
+  unsigned load=audio_load_q8;
+  if(load>218u){
+    int oldest=-1,live=0;
+    for(int i=0;i<4;i++)if(strings[i].active){live++;if(oldest<0 || strings[i].age<strings[oldest].age)oldest=i;}
+    if(live>1){strings[oldest].active=0;governor_hits++;}
+    if(load>243u && governor_fx_off<4)governor_fx_off++;
+  }else if(load<180u && governor_fx_off)governor_fx_off=0;
+#endif
+}
 static void app_audio(int32_t *out, uint32_t n) {
+  load_governor();
   if (!audio_ready) return; /* Platform supplies a cleared buffer during startup. */
   apply_events();
   if(transport==STOP){slip_offset=slip_target=slip_mix=0;range_down=0;}
@@ -1165,7 +1180,7 @@ static void app_audio(int32_t *out, uint32_t n) {
       default:w=sinus(phase);
     }
     lfo2_amount=bound(w,-127,127)*knob[LFO2][3]/127;lfo2_phase=phase;lfo2_wave=bound(w,-127,127); }
-  b.fx_type=knob[MODFX][0]>4?knob[MODFX][0]-4:knob[MODFX][0]; b.fx_post=knob[MODFX][0]>4;   /* 1.20: 5-8 run after the tape */
+  b.fx_type=governor_fx_off>=4?0:knob[MODFX][0]>4?knob[MODFX][0]-4:knob[MODFX][0]; b.fx_post=knob[MODFX][0]>4;   /* 1.20: 5-8 run after the tape */
   { int rate=bound(knob[MODFX][1]+rf_mod(RF_FXRATE),0,100);
     unsigned hz100=5u<<(rate/10);hz100+=hz100*(unsigned)(rate%10)/10;           /* 0.05 Hz .. about 50 Hz, doubling every 10 */
     if(hz100>1000)hz100=1000;
@@ -1782,6 +1797,12 @@ static void draw(void) {
     else if(page==LIGHTS)bulb_icon(120,50,knob[LIGHTS][0]);
     else if(page==MIDI)midi_icon(120,62);
     else {bluetooth_mark();midi_icon(152,62);}
+#if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
+    if(page==MIDI){char c[24]="CPU ";number(c+4,(int)(audio_load_peak_q8*100u/256u));
+      unsigned k=0;while(c[k])k++;c[k++]='%';c[k++]=' ';c[k++]=' ';c[k]=0;
+      if(governor_hits){c[k++]='-';number(c+k,(int)governor_hits);}
+      lettering(120,104,c,audio_load_peak_q8>230u?gold:silver,0);audio_load_peak_q8=audio_load_peak_q8*63u/64u;}
+#endif
     const char *status=page==MIDI?(beat_ms && knob[MIDI][2]?"CLOCK LOCKED":"MIDI INPUT"):
                        page==CHARACTER?"TAPE CHARACTER":page==LIGHTS?(latch_armed?"HOLD ON":"KEYS AND HOLD"):"SYSTEM MIDI PORTS";
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
