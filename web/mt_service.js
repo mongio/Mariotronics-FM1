@@ -278,7 +278,13 @@ $('pianoWrite').onclick=()=>service('pianoStatus',async msg=>{
     for(let off=0;off<img.length;off+=128){
       const index=off/128,data=[index>>7];
       for(const b of img.subarray(off,off+128))data.push(b>>4,b&15);
-      if((await request(11,index&127,data,20000))[7])throw Error('Writing failed at '+Math.round(100*off/img.length)+'%. Reconnect and write again.');
+      // 1.20: a piece whose answer does not come is sent again (the FM-1 accepts a repeat of the last one)
+      let reply=null;
+      for(let attempt=0;attempt<5 && !reply;attempt++){
+        try{reply=await request(11,index&127,data,attempt<4?4000:20000);}
+        catch(e){if(attempt===4)throw Error('USB timeout at '+Math.round(100*off/img.length)+'%. Reconnect and write again.');msg.textContent='No answer, sending again · '+Math.floor(100*off/img.length)+'%';}
+      }
+      if(reply[7])throw Error('Writing failed at '+Math.round(100*off/img.length)+'%. Reconnect and write again.');
       if(!(index%16))msg.textContent='Writing piano samples · '+Math.floor(100*off/img.length)+'%';
     }
     if((await request(12,0,[],20000))[7])throw Error('Verification failed. Write again.');

@@ -38,5 +38,14 @@ async function boot(saved){
   let f=await boot();f.tick(50);
   for(const [slot,eng] of [[0,0],[16,1],[32,2],[40,3],[52,4],[60,0]]){f.select(slot);f.tick(3);f.go(6,1);assert.equal(f.w.param(2),eng,'P'+(slot+1)+' engine');}
   f.select(40);f.tick(3);f.go(5,29);f.press(5);f.w.set_param(0,0);assert.equal(f.w.param(2),1,'P41 routes LFO A to Beat');
+  // Beta 7: engine change keeps the plate and tape; OFF-TAPE is global (kept across presets); filter POST types
+  let g=await boot();g.tick(50);
+  g.go(2,7);g.w.set_param(0,77);g.w.set_param(1,66);
+  g.go(8,0);g.w.set_param(1,44);
+  g.go(6,1);g.w.set_param(2,3);g.tick(3);g.w.set_param(2,1);g.tick(3);
+  g.go(2,7);assert.equal(g.w.param(0),77,'plate mix kept across engines');assert.equal(g.w.param(1),66);
+  g.go(8,0);assert.equal(g.w.param(1),44,'tape feedback kept across engines');
+  g.go(7,14);g.w.set_param(0,63);g.select(20);g.tick(5);g.go(7,14);assert.equal(g.w.param(0),63,'OFF-TAPE is a global setting');
+  g.go(2,18);g.w.set_param(0,4);assert.equal(g.w.param(0),4,'LP POST');
   console.log('ENO menu and dark pads, eight modulation types, RADIGUE matrix audio/save/reboot, factory engines verified.');
 })().catch(e=>{console.error(e);process.exitCode=1});

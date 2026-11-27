@@ -12,7 +12,7 @@ async function check() {
   const leds = new Uint8Array(w.memory.buffer,w.leds(),41);
   step();
   assert.equal(leds[8],3);
-  for (const [button,page] of [[4,8],[3,2],[5,10],[6,1],[2,9],[7,16],[7,22],[7,21],[7,11],[7,12],[7,15]]) {
+  for (const [button,page] of [[4,8],[3,2],[5,10],[6,1],[2,9],[7,16],[7,22],[7,21],[7,14],[7,11],[7,12],[7,15]]) {
     press(button); assert.equal(w.page(),page); assert.equal(leds[button],3);
     assert.equal(leds[8],0);
   }

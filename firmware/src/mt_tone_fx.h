@@ -6,7 +6,7 @@ typedef struct { int low, mid, frequency, high, mode, cutoff, resonance, mix; } 
 
 static ToneControls tone_controls(void) {
   return (ToneControls){knob[EQ][0],knob[EQ][1],knob[EQ][2],knob[EQ][3],
-                        knob[FILTER][0],knob[FILTER][1],knob[FILTER][2],knob[FILTER][3]};
+                        knob[FILTER][0]%3,knob[FILTER][1],knob[FILTER][2],knob[FILTER][3]};   /* 1.20: Type 3-5 = POST */
 }
 static ToneCoefficients tone_coeff(ToneControls t,int i) {
   float a0,a1,a2,b0,b1,b2;

@@ -66,6 +66,7 @@ static int air_hw_start(void){
         if(!radio_power(1))return 0;
         radio_power(0);
     }
+    if(!radio_on && bt_up)fm1_ble_irqs_hold(1);   /* 1.20: no BLE interrupts while Wi-Fi owns the radio */
     fm1_wifi_up(fm1_wlc_hi,fm1_wlc_c,FM1_WLC_N);
     fm1_wifi_mac_wr(FM1_WIFI_RX_FILTER,FM1_WIFI_RX_FILTER_ALL);
     return 1;
@@ -75,7 +76,7 @@ static void air_stop(void){
     fm1_wifi_wr(FM1_WL_EN,fm1_wifi_rd(FM1_WL_EN)&~FM1_WL_EN_WIFI);
 }
 static void air_poll(unsigned now){
-    for(unsigned i=0;i<4;i++){
+    for(unsigned i=0;i<2;i++){                    /* 1.20: two frames per pass, the main loop stays quick */
         int n=fm1_wifi_rx(air_dma,FM1_WIFI_RX_MAX);
         if(n<(int)FM1_WIFI_RXWI)break;
         const uint8_t *rx=(const uint8_t *)(air_dma+1);

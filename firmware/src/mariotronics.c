@@ -23,6 +23,7 @@
 #include "mt_art.h"
 #include "platform.c"
 #include "mt_ble.h"
+#define MT_BUILD "1.20 b7"   /* shown at start-up and on the MIDI page */
 #include "mt_intro.h"
 #include "mt_piano.h"
 #include "mt_eno_bank.h"
@@ -49,7 +50,7 @@ static volatile int knob[][4] = {
 static const int maximum[][4] = {{80, 100, 100, 100},
                                  {1, 100, 4, 1},
                                  
-                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11, 12, 50},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8,1,1},{1,16,95,100},{100,100,100,180},{2,1,127,20},{100,100,100,100},{24,24,8,24},{2,100,100,100},{1,100,95,1},{100,100,1,24},{1,1,100,100},{96,1,100,50},{8,8,8,8},{1,16,95,100},{2,7,3,8},{1,2,8,8},{10,100,10,100},{50,3,100,4},{40,6,10,100},{8,100,100,100},{8,8,2,8},{3,3,9,7},{7,7,7,1}};
+                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11, 12, 50},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8,1,1},{1,16,95,100},{100,100,100,180},{2,1,127,20},{100,100,100,100},{24,24,8,24},{5,100,100,100},{1,100,95,1},{100,100,1,24},{1,1,100,100},{96,1,100,50},{8,8,8,8},{1,16,95,100},{2,7,3,8},{1,2,8,8},{10,100,10,100},{50,3,100,4},{40,6,10,100},{8,100,100,100},{8,8,2,8},{3,3,9,7},{7,7,7,1}};
 static const int minimum[][4] = {{40}, {0}, {0, 1, 0, 2}, {0}, {0,0,-12,-50},{0},{0},{0},{0},{0,1,0,0},{2,0,0,0},{0,0,0,1},{0},{0,-9,20,0},{0,0,0,20},{0,0,1,5},{0},{0},{0},{0,0,50,0},{0},{0},{0,0,0,-50},{0},{0,3,20,0},{0},{0},{0,-100,0,-100},{0,0,0,1},{0,0,0,-100},{0},{0},{0,0,0,-7},{0}};
 static const char *const riley_voices[]={"ORGAN","REED","REED ORG","HARMON."};
 static const char *const ambient_voices[]={"PIANO","PIANO","GLASS","CHOIR","RHODES","BOW GL.","E.GLASS","D.CHOIR","T.HAZE","ABYSS","NOCTURNE","UMBRA"};
@@ -933,7 +934,7 @@ typedef struct {
   unsigned layer_length, sums[2], peaks[2];
   int layer_target, mix, decay, damping, predelay, wet, hf_coefficient, saturation, wow, flutter;
   int monitor_voice, monitor_mix, color_mod, level_mod, tape_rate, peak_in, peak_out;
-  int fx_type, fx_post, fx_depth, fx_mix, off_level, off_tone, off_left, off_right, layer_reverse;
+  int fx_type, fx_post, tone_post, fx_depth, fx_mix, off_level, off_tone, off_left, off_right, layer_reverse;
   unsigned fx_inc;
 } AudioBlock;
 /* ENSEMBLE page: string ensemble, chorus, phaser and flanger on the instrument,
@@ -988,6 +989,7 @@ static AUDIO_FAST void audio_loop(int32_t *out, uint32_t n, AudioBlock *b) {
   int monitor_voice=b->monitor_voice, monitor_mix=b->monitor_mix;
   int color_mod=b->color_mod, level_mod=b->level_mod, tape_rate=b->tape_rate;
   int fx_type=b->fx_type, fx_post=b->fx_post, fx_depth=b->fx_depth, fx_mix=b->fx_mix; unsigned fx_inc=b->fx_inc;
+  int tone_post_now=b->tone_post;
   int off_level=b->off_level, off_tone=b->off_tone, off_left=b->off_left, off_right=b->off_right, layer_reverse=b->layer_reverse;
   int peak_in=0, peak_out=0;
   unsigned sums0=0, sums1=0, peaks0=0, peaks1=0;
@@ -1007,7 +1009,7 @@ static AUDIO_FAST void audio_loop(int32_t *out, uint32_t n, AudioBlock *b) {
     amp_lp += (amp - amp_lp) * (shape >= SINGING ? 2 : shape == 3 ? 5 : 3) / 8;
     int colored=amp_lp;
     if(color_mod)colored=bound(amp_lp+(amp-amp_lp)*color_mod/90,-32767,32767);
-    dry=tone_process(instrument_fx(colored),tone.mix);
+    dry=instrument_fx(colored);if(!tone_post_now)dry=tone_process(dry,tone.mix);
     if(level_mod)dry=dry*bound(100+level_mod,0,200)/100;   /* down to silence: a gate */
     /* IIR stages can retain a small DC residue after the voice has ended. */
     if(body || strings[0].active || strings[1].active || strings[2].active || strings[3].active)
@@ -1080,6 +1082,9 @@ static AUDIO_FAST void audio_loop(int32_t *out, uint32_t n, AudioBlock *b) {
     if(off_tone<256){modfx.head_lp+=(head-modfx.head_lp)*off_tone/256;head=modfx.head_lp;}
     int common = ret * knob[HOME][3] / 100, off = head * off_level / 100;
     int mix_l = dl + common + off*off_left/100, mix_r = dr + common + off*off_right/100;
+    if(tone_post_now){                            /* 1.20 EQ and FILTER POST: on the middle of the monitor, after the tape */
+      int centre=(mix_l+mix_r)/2,t=tone_process(centre,tone.mix);mix_l+=t-centre;mix_r+=t-centre;
+    }
     if(fx_type && fx_post){                       /* POST: the whole monitor (instrument, tape, off-tape) is modulated */
       int centre=(mix_l+mix_r)/2,pl,pr;
       mod_fx(centre,&pl,&pr,fx_type,fx_inc,fx_depth,fx_mix);
@@ -1180,7 +1185,7 @@ static void app_audio(int32_t *out, uint32_t n) {
       default:w=sinus(phase);
     }
     lfo2_amount=bound(w,-127,127)*knob[LFO2][3]/127;lfo2_phase=phase;lfo2_wave=bound(w,-127,127); }
-  b.fx_type=governor_fx_off>=4?0:knob[MODFX][0]>4?knob[MODFX][0]-4:knob[MODFX][0]; b.fx_post=knob[MODFX][0]>4;   /* 1.20: 5-8 run after the tape */
+  b.fx_type=governor_fx_off>=4?0:knob[MODFX][0]>4?knob[MODFX][0]-4:knob[MODFX][0]; b.fx_post=knob[MODFX][0]>4; b.tone_post=knob[FILTER][0]>2;   /* 1.20: 5-8 run after the tape */
   { int rate=bound(knob[MODFX][1]+rf_mod(RF_FXRATE),0,100);
     unsigned hz100=5u<<(rate/10);hz100+=hz100*(unsigned)(rate%10)/10;           /* 0.05 Hz .. about 50 Hz, doubling every 10 */
     if(hz100>1000)hz100=1000;
@@ -1288,7 +1293,7 @@ static const char *value_text(int k, char *s) {
   if(page==ARP && k==1 && v<3)return ((const char *const[]){"2.5","2","1.5","1.25","1",".75",".5",".33",".25",".2",".1",".05"})[bound(2-v,0,11)];
   if(page==LIGHTS) { static const char *const levels[]={"OFF","HALF","FULL"}; return levels[v]; }
   if(page==EQ || page==FILTER) {
-    if(page==FILTER && !k) {static const char *const type[]={"OFF","LP","HP"};return type[v];}
+    if(page==FILTER && !k) {static const char *const type[]={"OFF","LP","HP","OFF POST","LP POST","HP POST"};return type[v];}
     if((page==EQ && k==2)||(page==FILTER && k==1)) {
       unsigned hz=page==EQ?mid_hz[v]:cutoff_hz[v];
       if(hz>=1000) {number(s,hz/1000);int j=hz>=10000?2:1;s[j++]='.';s[j++]='0'+(hz/100)%10;s[j++]='k';s[j]=0;}
@@ -1467,6 +1472,7 @@ static void boot_draw(unsigned ms) {
   cv_blit(0,52);
   cv_begin(240,52,0);
   unpack_intro(intro_title,letters,240*22);
+  if(title>128)lettering(120,30,MT_BUILD,RGB(124*title/255,128*title/255,122*title/255),0);
 
   cv_blit(0,188);
 }
@@ -1725,8 +1731,32 @@ static void header_row(const char *pg,const char *eng,const char *slot,const cha
   int gap_l=6+wp+8, cx=(gap_l+right)/2;if(cx-we/2<gap_l)cx=gap_l+we/2;
   panel_text(cx,fe?0:2,eng,gold,we+1,fe);
 }
+#if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
+/* 1.20: while the editor writes piano samples the display says so; the controls wait */
+static int sample_screen(void){
+  if(eno_rx_active && fm1_ms-eno_rx_last>15000u){eno_rx_active=0;eno_rx_result=-1;eno_rx_result_at=fm1_ms;}
+  int showing_result=eno_rx_result_at && fm1_ms-eno_rx_result_at<4000u;
+  if(!eno_rx_active && !showing_result)return 0;
+  cv_begin(240,146,0);
+  if(eno_rx_active){
+    int pct=eno_rx_total?(int)((unsigned long long)eno_rx_done*100u/eno_rx_total):0;
+    lettering(120,30,"RECEIVING SAMPLES",gold,0);
+    cv_rect(30,70,180,10,metal);cv_rect(30,70,180*pct/100,10,gold);
+    char t[8];number(t,pct);unsigned k=0;while(t[k])k++;t[k++]='%';t[k]=0;
+    lettering(120,88,t,silver,0);lettering(120,118,"DO NOT TOUCH THE FM-1",silver,0);
+  }else{
+    lettering(120,50,eno_rx_result>0?"SAMPLES INSTALLED":"ERROR - TRY AGAIN",eno_rx_result>0?gold:RGB(230,90,70),0);
+    lettering(120,90,eno_rx_result>0?"VERIFIED":"FACTORY PIANO IN USE",silver,0);
+  }
+  cv_blit(0,52);
+  return 1;
+}
+#endif
 static void draw(void) {
   if(intro && fm1_ms-intro_start<INTRO_END_MS){boot_draw(fm1_ms-intro_start);return;}intro=0;
+#if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
+  if(sample_screen())return;
+#endif
   static const char *const modes[] = {"STOP", "REC", "DUB", "PLAY"};
   unsigned t = transport;
   cv_begin(240, 146, 0);
@@ -1779,7 +1809,8 @@ static void draw(void) {
     ToneControls t=tone_controls();
     ToneCoefficients coeff[4];
     for(int i=0;i<4;i++) coeff[i]=tone_coeff(t,i);
-    lettering(120,5,page==EQ?"EQUALIZER / PRE TAPE":"FILTER / PRE TAPE",gold,0);
+    { int post=knob[FILTER][0]>2;
+      lettering(120,5,page==EQ?(post?"EQUALIZER / POST TAPE":"EQUALIZER / PRE TAPE"):(post?"FILTER / POST TAPE":"FILTER / PRE TAPE"),gold,0); }
     cv_line(20,73,220,73,metal);
     int last=73;
     for(int j=0;j<=40;j++) {
@@ -1801,7 +1832,7 @@ static void draw(void) {
     if(page==MIDI){char c[24]="CPU ";number(c+4,(int)(audio_load_peak_q8*100u/256u));
       unsigned k=0;while(c[k])k++;c[k++]='%';c[k++]=' ';c[k++]=' ';c[k]=0;
       if(governor_hits){c[k++]='-';number(c+k,(int)governor_hits);}
-      lettering(120,104,c,audio_load_peak_q8>230u?gold:silver,0);audio_load_peak_q8=audio_load_peak_q8*63u/64u;}
+      lettering(120,104,c,audio_load_peak_q8>230u?gold:silver,0);lettering(120,4,"MARIOTRONICS " MT_BUILD,metal,0);audio_load_peak_q8=audio_load_peak_q8*63u/64u;}
 #endif
     const char *status=page==MIDI?(beat_ms && knob[MIDI][2]?"CLOCK LOCKED":"MIDI INPUT"):
                        page==CHARACTER?"TAPE CHARACTER":page==LIGHTS?(latch_armed?"HOLD ON":"KEYS AND HOLD"):"SYSTEM MIDI PORTS";
@@ -2009,9 +2040,11 @@ static void set_key_backlight(int level) {
 }
 /* Global settings: 0 key light, 1-4 TAPE CHARACTER, 5-6 SPEED; Lab 8: 7 Hold Key, 8 key Velocity,
    9 Hold time, 10 BLE Keys Out, 11 BLE Thru, 12 ERASE Depth, 13 ERASE Soft, 14 SPEED Glide, 15 SPEED Fine (+50). */
-static unsigned char globals[16]={2,32,0,0,0,2,0,0,110,10,1,0,100,0,0,50};
-static const unsigned char global_page[16][2]={{LIGHTS,0},{CHARACTER,0},{CHARACTER,1},{CHARACTER,2},{CHARACTER,3},{SPEED,0},{SPEED,1},
-  {LIGHTS,1},{LIGHTS,2},{LIGHTS,3},{BT,2},{BT,3},{ERASE,2},{ERASE,3},{SPEED,2},{SPEED,3}};
+static unsigned char globals[20]={2,32,0,0,0,2,0,0,110,10,1,0,100,0,0,50,25,100,50,180};   /* 16-19: OFF-TAPE (1.20, global) */
+static const unsigned char global_page[20][2]={{LIGHTS,0},{CHARACTER,0},{CHARACTER,1},{CHARACTER,2},{CHARACTER,3},{SPEED,0},{SPEED,1},
+  {LIGHTS,1},{LIGHTS,2},{LIGHTS,3},{BT,2},{BT,3},{ERASE,2},{ERASE,3},{SPEED,2},{SPEED,3},
+  {OFF_TAPE,0},{OFF_TAPE,1},{OFF_TAPE,2},{OFF_TAPE,3}};
+static void global_offtape(void){for(int i=0;i<4;i++)knob[OFF_TAPE][i]=globals[16+i];}   /* 1.20: the first playback head is a tape setting */
 static int globals_changed;
 static unsigned light_changed;
 static uint16_t midi_lit[128];
@@ -2019,7 +2052,7 @@ static uint16_t midi_lit[128];
 static void update_leds(unsigned keys) {
   static const unsigned char page_button[PAGE_COUNT] = {
     BTN_HOME, BTN_EDIT, BTN_SEL, BTN_FX, BTN_SEL, BTN_FX, BTN_FX, BTN_FX,
-    BTN_ENV, BTN_FX, BTN_LFO, BTN_GLO, BTN_GLO, BTN_ARP, BTN_FX, BTN_GLO, BTN_GLO, BTN_FX, BTN_FX, BTN_EDIT, BTN_ARP, BTN_GLO, BTN_GLO, BTN_EDIT, BTN_EDIT, BTN_EDIT, BTN_LFO, BTN_LFO, BTN_ARP, BTN_LFO, BTN_FX, BTN_EDIT, BTN_LFO, BTN_LFO
+    BTN_ENV, BTN_FX, BTN_LFO, BTN_GLO, BTN_GLO, BTN_ARP, BTN_GLO, BTN_GLO, BTN_GLO, BTN_FX, BTN_FX, BTN_EDIT, BTN_ARP, BTN_GLO, BTN_GLO, BTN_EDIT, BTN_EDIT, BTN_EDIT, BTN_LFO, BTN_LFO, BTN_ARP, BTN_LFO, BTN_FX, BTN_EDIT, BTN_LFO, BTN_LFO
   };
   static unsigned previous_keys, previous_buttons;
   unsigned buttons = 1u << page_button[page];
@@ -2051,10 +2084,12 @@ static void update_leds(unsigned keys) {
 static void app_setup(void) {
   eno_open();
   for(unsigned i=0;i<1024;i++)scope_ring[i]=0;
-  unsigned char stored[16];
-  if(!settings_load(stored,16)){                  /* Lab 8 */
+  unsigned char stored[20];
+  int with_offtape=!settings_load(stored,20);
+  if(with_offtape || !settings_load(stored,16)){  /* Lab 8; 1.20 adds OFF-TAPE */
     for(int i=0;i<16;i++){int pg=global_page[i][0],k=global_page[i][1],v=i==15?stored[i]-50:stored[i];
       if(v>=minimum[pg][k] && v<=maximum[pg][k])globals[i]=stored[i];}
+    if(with_offtape)for(int i=16;i<20;i++){int pg=global_page[i][0],k=global_page[i][1];if(stored[i]>=minimum[pg][k] && stored[i]<=maximum[pg][k])globals[i]=stored[i];}
     if(globals[6]>1 || globals[5]>(globals[6]?96:3)){globals[5]=2;globals[6]=0;}
     for(int i=7;i<16;i++)knob[global_page[i][0]][global_page[i][1]]=i==15?globals[i]-50:globals[i];
     knob[SPEED][0]=globals[5];knob[SPEED][1]=globals[6];
@@ -2062,13 +2097,14 @@ static void app_setup(void) {
   else if(!settings_load(stored,7) && stored[6]<=1 && stored[5]<=(stored[6]?96:3)){
     globals[5]=knob[SPEED][0]=stored[5];globals[6]=knob[SPEED][1]=stored[6];
   }
-  if(!settings_load(stored,16)) {}
+  if(with_offtape || !settings_load(stored,16)) {}
   else if((!settings_load(stored,7) || !settings_load(stored,5)) && stored[0]<=2) {
     globals[0]=stored[0];
     for(int i=1;i<5;i++) if(stored[i]<=100)globals[i]=stored[i];
   } else if(!settings_load(stored,1) && stored[0]<=2) globals[0]=stored[0];
   knob[LIGHTS][0]=globals[0];set_key_backlight(globals[0]);
   for(int i=0;i<4;i++)knob[CHARACTER][i]=globals[1+i];
+  global_offtape();
   intro=1;intro_start=fm1_ms;plate_init();
   RING_PUBLISH();
   programs_init();
@@ -2094,9 +2130,9 @@ static void set_control(int k,int v) {
     v=0;
 #endif
   }
-  if((page==LIGHTS && k) || (page==BT && k>=2) || (page==ERASE && k>=2) || (page==SPEED && k>=2)){
+  if((page==LIGHTS && k) || (page==BT && k>=2) || (page==ERASE && k>=2) || (page==SPEED && k>=2) || page==OFF_TAPE){
     int nv=bound(v,minimum[page][k],maximum[page][k]);knob[page][k]=nv;
-    for(int i=7;i<16;i++)if(global_page[i][0]==page && global_page[i][1]==k)globals[i]=(unsigned char)(i==15?nv+50:nv);
+    for(int i=7;i<20;i++)if(global_page[i][0]==page && global_page[i][1]==k)globals[i]=(unsigned char)(i==15?nv+50:nv);
     globals_changed=1;light_changed=fm1_ms;return;
   }
   if(page==SPEED){
@@ -2215,6 +2251,14 @@ static void app_step(void) {
 #endif
   static unsigned key_prev, last_frame, rec_started;
   static int rec_pending;
+#if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
+  if(eno_rx_active){                              /* 1.20: samples arriving: keys and knobs wait, nothing is saved */
+    unsigned ignored=0;(void)fm1_input_edges(&ignored);
+    for(int e=0;e<7;e++)(void)fm1_enc_take(e);
+    if(fm1_ms-last_frame>=200u){last_frame=fm1_ms;draw();}
+    return;
+  }
+#endif
   unsigned rel = 0, edge = fm1_input_edges(&rel), keys = fm1_in.notes;
   if(edge || keys)intro=0;
   if(edge & ~(1u<<BTN_SAVE)) naming=0;
@@ -2243,7 +2287,7 @@ static void app_step(void) {
            knob[SOUND][2]==1 && page==MOTION ? NOTE_FX :
            knob[SOUND][2]==1 && page==NOTE_FX ? HEAD2 : SOUND;
   if (edge & (1u << BTN_SEL)){if(page==LFO)vib_on=!vib_on;else page=page==ART?SCALE:ART;}
-  if (edge & (1u << BTN_GLO)) page = page==CHARACTER ? SPEED : page==SPEED ? ERASE : page==ERASE ? MIDI : page==MIDI ? BT : page==BT ? LIGHTS : CHARACTER;
+  if (edge & (1u << BTN_GLO)) page = page==CHARACTER ? SPEED : page==SPEED ? ERASE : page==ERASE ? OFF_TAPE : page==OFF_TAPE ? MIDI : page==MIDI ? BT : page==BT ? LIGHTS : CHARACTER;
   if(edge & (1u<<BTN_ARP)) {
     if(voice_kind()==AIR){air_freeze();page=TIMBRE;}
     else if(knob[SOUND][2]==0 && page==ARP){page=PICK_ART;}
@@ -2272,7 +2316,7 @@ static void app_step(void) {
   if (edge & (1u << BTN_PLAY))
     post(EV_PLAY, 0, 0);
   if (edge & (1u << BTN_FX))
-    page = page==COMP ? FUZZ : page==FUZZ ? WAH : page==WAH ? AMP : page==AMP ? EQ : page==EQ ? FILTER : page==FILTER ? MODFX : page==MODFX ? OFF_TAPE : page==OFF_TAPE ? PLATE : COMP;
+    page = page==COMP ? FUZZ : page==FUZZ ? WAH : page==WAH ? AMP : page==AMP ? EQ : page==EQ ? FILTER : page==FILTER ? MODFX : page==MODFX ? PLATE : COMP;
   if (edge & (1u << BTN_ENV)) page = ENV;
   int d = fm1_enc_take(ENC_SELECT);
   if(d)intro=0;
@@ -2343,7 +2387,7 @@ static void app_step(void) {
   air_step(voice_kind()==AIR || knob[UNCERT][0],fm1_ms);
   latch_keys=latched_keys();
   update_leds(keys|latch_keys);
-  if(globals_changed && fm1_ms-light_changed>=2000u) {   /* 1.20: after 2 s of quiet, one page program */
+  if(globals_changed && fm1_ms-light_changed>=2000u && !eno_rx_active) {   /* 1.20: after 2 s of quiet, one page program */
     if(!settings_save(globals,sizeof globals)) globals_changed=0;
     light_changed=fm1_ms;
   }

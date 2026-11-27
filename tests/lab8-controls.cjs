@@ -18,7 +18,7 @@ async function boot(saved){
 (async()=>{
   // Every page offers four controls that move within their ranges.
   let e=await boot();
-  for(const [page,button] of [[P.SCALE,3],[P.OFF_TAPE,2],[P.MODFX,2],[P.LFO2,5],[P.KEYS,7],[P.SPEED,7],[P.ERASE,7],[P.BT,7]]){
+  for(const [page,button] of [[P.SCALE,3],[P.OFF_TAPE,7],[P.MODFX,2],[P.LFO2,5],[P.KEYS,7],[P.SPEED,7],[P.ERASE,7],[P.BT,7]]){
     e.go(button,page);
     for(let k=0;k<4;k++){const before=e.w.param(k);e.w.set_param(k,before+1);e.tick();e.w.set_param(k,before);e.tick();assert.equal(e.w.param(k),before,'page '+page+' knob '+k);}
   }
@@ -44,7 +44,7 @@ async function boot(saved){
   // ENSEMBLE is stereo; with it off, left and right are equal.
   { const [off,on]=await effect(1,3,P.MODFX,2,0,1); assert(on.diff>off.diff*1.3,'ensemble widens the image '+off.diff+' '+on.diff); }
   // OFF-TAPE Pan moves the first head's signal.
-  { const run=async pan=>{const x=await boot();x.w.enc(1,1);x.tick();x.go(2,P.PLATE??7);x.go(2,P.OFF_TAPE);x.w.set_param(0,100);x.w.set_param(2,pan);x.tick();
+  { const run=async pan=>{const x=await boot();x.w.enc(1,1);x.tick();x.go(7,P.OFF_TAPE);x.w.set_param(0,100);x.w.set_param(2,pan);x.tick();
       x.press(13);return x.listen([60,64],500).diff;};
     const centre=await run(50),left=await run(0);assert(left>centre*1.3,'off-tape pan '+centre+' '+left); }
   // LFO 2 on pitch adds to the vibrato.

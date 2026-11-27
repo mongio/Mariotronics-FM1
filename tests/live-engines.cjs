@@ -25,16 +25,16 @@ async function session(mode) {
   rec(); assert.equal((w.state()>>4)&3,3); // HOLD
   engine(mode==='reference'?0:1);
   assert.equal((w.state()>>4)&3,3);
-  if(mode!=='reference') w.set_param(1,56);
+  if(mode!=='reference') w.set_param(2,56);   /* Send is the engine's own; feedback (post-loop) is shared since 1.20 */
   page(8); if(mode!=='reference') w.set_param(0,46);
   if(mode==='dub') rec(); else run(2);
   if(mode!=='reference') w.keys(1<<16);
   run(90); w.keys(0); run(400);
   if(mode==='dub') rec(); else run(2);
   engine(-1); assert.equal(w.param(0),15);
-  page(0); assert.equal(w.param(1),91);
+  page(0); assert.equal(w.param(1),91); assert.equal(w.param(2),80);
   engine(mode==='reference'?0:1);
-  if(mode!=='reference') assert.equal(w.param(1),56);
+  if(mode!=='reference') {assert.equal(w.param(2),56); assert.equal(w.param(1),91);}
   engine(-1); run(750);
   assert.deepEqual(new Uint8Array(w.memory.buffer,w.store(),w.store_len()),initial);
   const result=Buffer.alloc(690*512*2);

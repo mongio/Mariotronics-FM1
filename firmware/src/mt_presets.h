@@ -1,6 +1,7 @@
 /* 64 guitar/tape programs. Two alternating flash sectors keep the previous
  * complete set available until the new payload and its checksum are committed. */
 enum { PROGRAM_COUNT = 64 };
+static void global_offtape(void);
 static const unsigned char patch_pages[] = {
   HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, ARP, OFF_TAPE
 };
@@ -94,9 +95,10 @@ static void capture_tone(TonePatch *t) {
   packed=(packed<<4)|knob[UNCERT][2];
   packed=(packed<<2)|knob[UNCERT][1];
   packed=(packed<<1)|knob[UNCERT][0];
+  packed|=(unsigned)(knob[FILTER][0]>2)<<21;      /* 1.20: EQ and FILTER after the tape */
   for(int i=0;i<8;i++){
     unsigned n=tone_bits[i];
-    ((unsigned char *)t)[i]=knob[i<4?EQ:FILTER][i%4]|(packed<<n);
+    ((unsigned char *)t)[i]=(i==4?knob[FILTER][0]%3:knob[i<4?EQ:FILTER][i%4])|(packed<<n);
     packed>>=8-n;
   }
 }
@@ -111,7 +113,8 @@ static void apply_tone(const TonePatch *t) {
   knob[UNCERT][0]=packed&1;knob[UNCERT][1]=bound((packed>>1)&3,0,2);
   knob[UNCERT][2]=bound((packed>>3)&15,0,8);knob[UNCERT][3]=bound((packed>>7)&15,0,8);
   knob[ROUTE][0]=(packed>>11)&3;
-  int z=bound(packed>>13,0,200);knob[ROUTE][1]=(z&1)?-(z+1)/2:z/2;
+  knob[FILTER][0]=bound(knob[FILTER][0],0,2)+3*((packed>>21)&1);
+  int z=bound((packed>>13)&255,0,200);knob[ROUTE][1]=(z&1)?-(z+1)/2:z/2;
   rf_amount=rf_amount2=rf_source=0;
 }
 /* Lab 8 controls stored in ExtraPatch.more (zero = default). */
@@ -248,6 +251,12 @@ static void switch_engine(int next) {
 #if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
   unsigned flags=irq_save();
 #endif
+  /* 1.20: what follows the tape stays as it is when the engine changes: plate, tape delay, feedback and
+     return, the second head, and the ensemble, EQ and filter when they are set to POST. */
+  int keep_plate[4],keep_home[4],keep_head2[4],keep_fx[4],keep_eq[4],keep_filter[4];
+  int fx_post_was=knob[MODFX][0]>4,tone_post_was=knob[FILTER][0]>2;
+  for(int i=0;i<4;i++){keep_plate[i]=knob[PLATE][i];keep_home[i]=knob[HOME][i];keep_head2[i]=knob[HEAD2][i];
+    keep_fx[i]=knob[MODFX][i];keep_eq[i]=knob[EQ][i];keep_filter[i]=knob[FILTER][i];}
   capture_patch(&working[current]);capture_tone(&tone_working[current]);capture_extra(&extra_working[current]);
   working_valid[current]=1;
   if (working_valid[next]) {apply_patch(&working[next]);apply_tone(&tone_working[next]);apply_extra(&extra_working[next]);} else {apply_tone(&neutral_tone);apply_extra(&no_extra);}
@@ -269,6 +278,11 @@ static void switch_engine(int next) {
   if(!working_valid[next] && next==4){knob[TIMBRE][0]=0;knob[ENV][0]=24;knob[ENV][2]=100;knob[ENV][3]=55;}
   knob[SOUND][2]=next;
   if(!working_valid[next] && new_timbre_kind(voice_kind()))knob[TIMBRE][2]=knob[TIMBRE][3]=0;   /* Lab 8 extras start off */
+  { int fx_post_now=knob[MODFX][0]>4,tone_post_now=knob[FILTER][0]>2;
+    for(int i=0;i<4;i++){knob[PLATE][i]=keep_plate[i];knob[HEAD2][i]=keep_head2[i];if(i!=2)knob[HOME][i]=keep_home[i];
+      if(fx_post_was || fx_post_now)knob[MODFX][i]=keep_fx[i];
+      if(tone_post_was || tone_post_now){knob[EQ][i]=keep_eq[i];knob[FILTER][i]=keep_filter[i];}} }
+  global_offtape();
   if(page==RING && next!=4)page=TIMBRE;
   if((page==MATRIX || page==MLFO) && next!=3)page=LFO2;
   if(page==PICK_ART && next!=0)page=ARP;
@@ -318,6 +332,7 @@ static void recall_program(int slot) {
   if((page==MATRIX || page==MLFO) && knob[SOUND][2]!=3)page=LFO2;
   if((page==NOTE_FX || page==HEAD2) && knob[SOUND][2]!=1)page=SOUND;
   if((page==TIMBRE || page==MOTION) && !knob[SOUND][2])page=SOUND;
+  global_offtape();
   program=slot;
   program_notice=bank.custom[slot]==EMPTY_SLOT?"EMPTY SLOT":bank.custom[slot]?"USER PRESET":"FACTORY PRESET";
   program_notice_time=fm1_ms;

@@ -73,7 +73,7 @@ static int radio_power(int on) {
     if (bt_up) {
         fm1_ble_irqs_hold(1);
         if (!on) {ble_ll_scan(0);ble_central_cancel();scanning=0;bti_r=bti_w;bt_lost=1;}
-        ble_enable(on);fm1_ble_irqs_hold(0);
+        ble_enable(on);fm1_ble_irqs_hold(!on);   /* 1.20: with the radio off its interrupts stay off (Wi-Fi shares the radio) */
     }
     radio_on=on;bt_status=on?"Radio on":"Radio off";return on;
 }

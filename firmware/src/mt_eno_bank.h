@@ -15,6 +15,9 @@ typedef struct { unsigned offset; unsigned short blocks; unsigned char mode, spa
 static EnoSlot eno_slots[12] POOLMEM;
 static const uint8_t *eno_flash;
 static int eno_extended, eno_version;            /* version: 0 empty, 1 v1, 2 v2, 3 foreign */
+/* 1.20: what the display shows while the editor sends samples, and how it ended */
+static unsigned eno_rx_active, eno_rx_done, eno_rx_total, eno_rx_last, eno_rx_result_at;
+static int eno_rx_result;                        /* 1 installed, -1 failed */
 static const uint8_t eno_signature[16]="MTEP1-SAL-V3";
 static const uint8_t eno_signature2[16]="MTEP2-SAMPLES";
 enum { ENO_HEADER=128, ENO_BLOCK=35, ENO_MAX_BLOCKS=2048 };
@@ -114,11 +117,19 @@ static int eno_transfer(const uint8_t *p,unsigned n,uint8_t *reply,unsigned *len
             }
             eno_open();return 0;
         }
-        accepting=1;return 0;
+        accepting=1;eno_rx_active=1;eno_rx_done=0;eno_rx_total=length;eno_rx_last=fm1_ms;eno_rx_result_at=0;return 0;
     }
     if(!accepting)return 1;
     if(op==12 && n==3 && next==length){
-        accepting=0;eno_open();return eno_version==2?0:1;
+        accepting=0;eno_open();eno_rx_active=0;eno_rx_result=eno_version==2?1:-1;eno_rx_result_at=fm1_ms;
+        return eno_version==2?0:1;
+    }
+    /* a piece sent again because its answer was lost: already written, answer it once more */
+    if(op==11 && n>=4 && next>=128 && p[2]+128u*p[3]==(next-1)/128u){
+        unsigned at=((next-1)/128u)*128u,count=next-at;
+        if(n!=4+2*count)return 1;
+        for(unsigned i=0;i<count;i++)if(eno_flash[at+i]!=(uint8_t)(16*p[4+2*i]+p[5+2*i]))return 1;
+        eno_rx_last=fm1_ms;return 0;
     }
     if(op!=11 || n<4 || p[2]+128u*p[3]!=next/128u || next>=length)return 1;
     unsigned count=length-next;if(count>128)count=128;
@@ -135,6 +146,6 @@ static int eno_transfer(const uint8_t *p,unsigned n,uint8_t *reply,unsigned *len
         erased+=4096;
     }
     if(ub_write(next,data,count) || __builtin_memcmp(eno_flash+next,data,count))return 1;
-    next+=count;return 0;
+    next+=count;eno_rx_done=next;eno_rx_last=fm1_ms;return 0;
 }
 #endif

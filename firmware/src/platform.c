@@ -160,12 +160,12 @@ static uint32_t crc32(const uint8_t *p, uint32_t n)
     }
     return ~c;
 }
-/* 1.20: small settings (<= 16 bytes) are appended as 32-byte records into the sector, so a save is one page
- * program (about a millisecond with the interrupts off) and the sector is erased only once every 128 saves.
+/* 1.20: small settings (<= 48 bytes) are appended as 64-byte records into the sector, so a save is one page
+ * program (about a millisecond with the interrupts off) and the sector is erased only once every 64 saves.
  * The erase stops the sound and the key scan for 40 ms on a Puya chip and up to 0.6 s on a UC25HQ80: it used to
  * happen on every save. The older single record (header DNGY at 0) is still read. */
 #define SETTINGS_LOG_MAGIC 0x324C544Du          /* "MTL2" */
-typedef struct { uint32_t magic, seq, n, crc; uint8_t data[16]; } settings_rec_t;
+typedef struct { uint32_t magic, seq, n, crc; uint8_t data[48]; } settings_rec_t;   /* 64 bytes: 64 saves per erase */
 static int settings_scan(uint32_t n, settings_rec_t *best, uint32_t *free_at)   /* 1: a record of size n found */
 {
     settings_rec_t r;
@@ -178,7 +178,7 @@ static int settings_scan(uint32_t n, settings_rec_t *best, uint32_t *free_at)   
         for (k = 0; k < sizeof r / 4u; k++) if (w[k] != 0xFFFFFFFFu) blank = 0;
         if (blank) { if (*free_at == 0x1000u) *free_at = off; continue; }
         *free_at = 0x1000u;                       /* only blank slots after the last used one count */
-        if (r.magic == SETTINGS_LOG_MAGIC && r.n == n && n <= 16u && crc32(r.data, n) == r.crc && (!found || r.seq > best->seq)) {
+        if (r.magic == SETTINGS_LOG_MAGIC && r.n == n && n <= 48u && crc32(r.data, n) == r.crc && (!found || r.seq > best->seq)) {
             *best = r;
             found = 1;
         }
@@ -192,7 +192,7 @@ static int settings_load(void *p, uint32_t n)   /* 0: loaded; else p is untouche
     settings_rec_t r;
     if (!flash_ok || n > sizeof buf)
         return -1;
-    if (n <= 16u && settings_scan(n, &r, &free_at)) { memcpy(p, r.data, n); return 0; }
+    if (n <= 48u && settings_scan(n, &r, &free_at)) { memcpy(p, r.data, n); return 0; }
     if (st_read(SETTINGS_AT, h, sizeof h) || h[0] != SETTINGS_MAGIC || h[1] != n)
         return -1;
     if (st_read(SETTINGS_AT + sizeof h, buf, n) || crc32(buf, n) != h[2])
@@ -200,15 +200,15 @@ static int settings_load(void *p, uint32_t n)   /* 0: loaded; else p is untouche
     memcpy(p, buf, n);
     return 0;
 }
-static int settings_save(const void *p, uint32_t n)   /* p in RAM, n <= 16 */
+static int settings_save(const void *p, uint32_t n)   /* p in RAM, n <= 48 */
 {
     settings_rec_t r, last;
     uint32_t free_at, took, seq = 1;
     int rc;
-    if (!flash_ok || n > 16u)
+    if (!flash_ok || n > 48u)
         return -1;
     if (settings_scan(n, &last, &free_at)) seq = last.seq + 1u;
-    if (free_at >= 0x1000u) {                     /* full (or the old format): erase, once in 128 saves */
+    if (free_at >= 0x1000u) {                     /* full (or the old format): erase, once in 64 saves */
         if ((rc = fl_erase4k(SETTINGS_AT, &took)) != 0) return rc;
         free_at = 0;
     }
