@@ -55,8 +55,54 @@ static AUDIO_FAST int board_tick(int excitation,int resonance){
     index++;
     return wet*(resonance+1)/24;
 }
+/* 1.20: three dark pads for ambient. TIMBRE a b c d (0-8), slow by design.
+ *   ABYSS     a sub-octave under two detuned saws, behind a low-pass that breathes.
+ *             Sub, Dark, Drift, Swell.
+ *   NOCTURNE  three slowly beating saws, a dark string section, with bowed air.
+ *             Spread, Tone, Motion, Air.
+ *   UMBRA     odd harmonics an octave down (a hollow, clarinet-like shadow) with
+ *             a slow breath and a low rumble. Hollow, Tone, Breath, Rumble. */
+static inline __attribute__((always_inline)) int saw4(unsigned ph){
+    return sinus(ph)+sinus(ph*2u)/2+sinus(ph*3u)/3+sinus(ph*4u)/4;     /* +-210 */
+}
+static AUDIO_FAST int dark_pad_tick(String *s,int a,int b,int c,int d){
+    s->phase+=s->increment;
+    s->motion_phase+=1100u+(unsigned)c*1900u;     /* 0.01-0.2 Hz */
+    int lfo=sinus(s->motion_phase);
+    int wave,cut;
+    int noise=rnd()/256;
+    if(s->kind==ABYSS){
+        s->sample_wave+=s->increment+s->increment/700+(unsigned)(lfo*c*9);
+        s->bell_phase+=s->increment>>1;
+        wave=saw4(s->phase)*20+saw4(s->sample_wave)*16+sinus(s->bell_phase)*(10+a*5);
+        cut=bound(10+(8-b)*7+lfo*(2+c)/40,3,90);
+    }else if(s->kind==NOCTURNE){
+        unsigned spread=s->increment/(1400-(unsigned)a*130);
+        s->sample_wave+=s->increment+spread+(unsigned)(lfo*c*6);
+        s->bell_phase+=s->increment-spread-(unsigned)(lfo*c*6);
+        s->neck+=(noise*40-s->neck)/24;
+        wave=(saw4(s->phase)+saw4(s->sample_wave)+saw4(s->bell_phase))*13+s->neck*d/6;
+        cut=bound(12+b*9,4,100);
+    }else{
+        unsigned ph=s->phase>>1;                   /* an octave down */
+        int hollow=sinus(ph)*24+sinus(ph*3u)*(8+a)/3+sinus(ph*5u)*(a+2)/5+sinus(ph*7u)*a/9;
+        s->sample_pos+=1400u+(unsigned)c*2300u;    /* the breath */
+        int breath=96+sinus(s->sample_pos)*(c+1)/10;
+        s->neck+=(noise*48-s->neck)/(64+16*(8-d));
+        wave=hollow*breath/128+s->neck*d/3;
+        cut=bound(8+b*8+sinus(s->sample_pos)*c/60,3,90);
+    }
+    /* two one-pole low-passes, 12 dB per octave: the darkness */
+    s->hammer_filter+=(wave-s->hammer_filter)*cut/128;
+    s->damper+=(s->hammer_filter-s->damper)*cut/128;
+    int swell_time=s->kind==ABYSS?1+d:s->kind==NOCTURNE?2:3;   /* ABYSS Swell: 0.4-3.5 s */
+    s->bloom=bound(s->bloom+1,0,0x7fffffff);
+    int swell=bound(s->bloom/(70*swell_time),0,256);
+    return s->damper*swell/256*s->strength/(s->kind==ABYSS?5900:s->kind==NOCTURNE?4100:5600);
+}
 static AUDIO_FAST int pad_tick(String *s){
     if(!(s->pitch_clock++&15))update_pitch(s);
+    if(s->kind>=ABYSS)return dark_pad_tick(s,rf_timbre(knob[TIMBRE][0]),knob[TIMBRE][1],knob[TIMBRE][2],knob[TIMBRE][3]);
     int a=rf_timbre(knob[TIMBRE][0]),b=knob[TIMBRE][1],c=knob[TIMBRE][2],d=knob[TIMBRE][3];
     s->phase+=s->increment;
     s->motion_phase+=2300u+(s->kind==TIDAL?d:c)*4200u;

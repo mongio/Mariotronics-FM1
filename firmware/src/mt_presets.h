@@ -137,7 +137,7 @@ static void apply_more(const signed char *m){
     knob[RING][0]=0;knob[RING][1]=2;knob[RING][2]=knob[RING][3]=0;
   }
   knob[LFO2][0]=bound(12+m[12],0,40);knob[LFO2][1]=bound(m[13],0,6);knob[LFO2][2]=bound(4+m[14],0,10);knob[LFO2][3]=bound(m[15],-100,100);
-  knob[MODFX][0]=bound(m[16],0,4);knob[MODFX][1]=bound(30+m[17],0,100);knob[MODFX][2]=bound(50+m[18],0,100);knob[MODFX][3]=bound(50+m[19],0,100);
+  knob[MODFX][0]=bound(m[16],0,8);knob[MODFX][1]=bound(30+m[17],0,100);knob[MODFX][2]=bound(50+m[18],0,100);knob[MODFX][3]=bound(50+m[19],0,100);
 }
 /* Lab 7 settings beside each program: ARP FEEL and the full Wi-Fi routing.
    A record without the tag (older banks, older backups padded with zeros) recalls the defaults. */

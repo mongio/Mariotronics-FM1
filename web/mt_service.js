@@ -1,4 +1,4 @@
-const targetIdentity='FM-1_878';
+const targetIdentity='FM-1_879';
 const isFm1=id=>id.model==='FM-1'||id.model==='ota-FM-1';
 let servicing=false;
 async function service(status,action){
@@ -24,7 +24,7 @@ $('install').onclick=()=>service('installNote',async msg=>{
   const {dev,up}=await usbDevice();
   const loader=dev.id.model==='ota-FM-1';
   const identity=dev.name+' · '+dev.id.text;
-  msg.textContent=identity+' → Mariotronics 1.19 · '+targetIdentity;
+  msg.textContent=identity+' → Mariotronics 1.20 · '+targetIdentity;
   const leave=e=>{e.preventDefault();e.returnValue='';};
   let lock,paused=false;
   try{
@@ -65,7 +65,7 @@ async function presetConnection(){
     },commit(){localStorage.setItem('mt.programBank.v1',btoa(String.fromCharCode(...store)));}};
   }
   const {dev}=await usbDevice();
-  if(dev.id.text!==targetIdentity && dev.id.text!=="FM-1_877" && dev.id.text!=="FM-1_876" && dev.id.text!=="FM-1_875" && dev.id.text!=="FM-1_874" && dev.id.text!=="FM-1_873" && dev.id.text!=="FM-1_872" && dev.id.text!=="FM-1_871" && dev.id.text!=="FM-1_870" && dev.id.text!=="FM-1_869" && dev.id.text!=="FM-1_868" && dev.id.text!=="FM-1_857" && dev.id.text!=="FM-1_856" && dev.id.text!=="FM-1_855" && dev.id.text!=="FM-1_854"){dev.link.close();throw Error('USB preset transfer requires a running Mariotronics 1.4 through 1.7, 1.18 or 1.19.');}
+  if(dev.id.text!==targetIdentity && dev.id.text!=="FM-1_878" && dev.id.text!=="FM-1_877" && dev.id.text!=="FM-1_876" && dev.id.text!=="FM-1_875" && dev.id.text!=="FM-1_874" && dev.id.text!=="FM-1_873" && dev.id.text!=="FM-1_872" && dev.id.text!=="FM-1_871" && dev.id.text!=="FM-1_870" && dev.id.text!=="FM-1_869" && dev.id.text!=="FM-1_868" && dev.id.text!=="FM-1_857" && dev.id.text!=="FM-1_856" && dev.id.text!=="FM-1_855" && dev.id.text!=="FM-1_854"){dev.link.close();throw Error('USB preset transfer requires a running Mariotronics 1.4 through 1.7, 1.18, 1.19 or 1.20.');}
   return {name:dev.id.text,close:()=>dev.link.close(),commit(){},async request(frame){
     dev.link.drain();
     if(!dev.link.send([0xf0,...frame,0xf7]))throw Error('FM-1 disconnected.');
@@ -221,7 +221,7 @@ function pianoImage(){
 }
 async function pianoLink(){
   const {dev}=await usbDevice();
-  if(dev.id.text!==targetIdentity){dev.link.close();throw Error('Install Mariotronics 1.19 on the FM-1 first (Identify and install).');}
+  if(dev.id.text!==targetIdentity){dev.link.close();throw Error('Install Mariotronics 1.20 on the FM-1 first (Identify and install).');}
   const request=async(op,lo,data=[],wait=8000)=>{
     dev.link.drain();
     if(!dev.link.send([240,...presetPrefix,op,lo,...data,247]))throw Error('FM-1 disconnected.');

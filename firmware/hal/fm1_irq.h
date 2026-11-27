@@ -43,7 +43,9 @@ typedef struct {
     uint32_t magic, count, vec, pc, rets, emu, dbg, sp, psr, icfg, uptime_ms;
     uint32_t etm[4];
     uint32_t early;                          /* consecutive crashes < 3 s after boot */
+    uint32_t ctx, shown;                     /* Mariotronics 1.20: the app's state, and whether the report was seen */
 } fm1_crash_t;
+static volatile uint32_t fm1_app_ctx;     /* set by the application every frame: page, engine, voice, radio */
 /* Not static: .noinit holds whatever the last run (or power-on) left, and a
  * file-local object would let the compiler assume its zero initial value and
  * fold the magic check away. */
@@ -112,6 +114,8 @@ void fm1_fault_c(uint32_t *f)
     for (i = 0; i < 4u; i++)
         fm1_crash.etm[i] = FM1_ETM_PC(i);
     fm1_crash.early = fm1_crash.uptime_ms < 3000u ? early + 1u : 0u;
+    fm1_crash.ctx = fm1_app_ctx;
+    fm1_crash.shown = 0;
     fm1_fault(&fm1_crash);
     for (;;)
         ;

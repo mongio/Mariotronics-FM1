@@ -364,23 +364,58 @@ static void platform_poll(void)
     }
 }
 
+static void hex8(char *b, uint32_t v)
+{
+    uint32_t k;
+    for (k = 0; k < 8u; k++) b[k] = "0123456789ABCDEF"[(v >> (28u - 4u * k)) & 15u];
+    b[8] = 0;
+}
+/* The crash report (1.20): every register the HAL kept, and the app's state at the fault. */
+static void crash_screen(const fm1_crash_t *c, int after_reboot)
+{
+    static const char *const label[8] = {"VEC", "PC", "RETS", "SP", "EMU", "DBG", "ETM", "CTX"};
+    uint32_t v[8] = {c->vec, c->pc, c->rets, c->sp, c->emu, c->dbg, c->etm[0], c->ctx}, i;
+    char b[12], n[12];
+    lcd_fill(0, 0, 240, 240, RGB(160, 0, 0));
+    draw_text_box(0, 6, 240, &FONT_S, APP_NAME " CRASH", C_WHITE, 1);
+    for (i = 0; i < 8u; i++) {
+        hex8(b, v[i]);
+        draw_text_box(14, 30 + i * 20, 70, &FONT_S, label[i], C_WHITE, 0);
+        draw_text_box(90, 30 + i * 20, 140, &FONT_S, b, C_WHITE, 0);
+    }
+    hex8(n, c->uptime_ms / 1000u);
+    draw_text_box(14, 192, 70, &FONT_S, "TIME", C_WHITE, 0);
+    draw_text_box(90, 192, 140, &FONT_S, n, C_WHITE, 0);
+    draw_text_box(0, 216, 240, &FONT_S, after_reboot ? "PHOTO, THEN ANY KEY" : "RESTARTING", C_WHITE, 1);
+}
 static void fm1_fault(const fm1_crash_t *c)
 {
-    char b[12];
-    uint32_t i, t0, v[3] = {c->vec, c->pc, c->rets};
+    uint32_t t0;
     fm1_audio_stop();
-    lcd_fill(0, 0, 240, 240, RGB(160, 0, 0));
-    draw_text_box(0, 20, 240, &FONT_S, APP_NAME " CRASH", C_WHITE, 1);
-    for (i = 0; i < 3u; i++) {
-        uint32_t k;
-        for (k = 0; k < 8u; k++) b[k] = "0123456789ABCDEF"[(v[i] >> (28u - 4u * k)) & 15u];
-        b[8] = 0;
-        draw_text_box(10, 60 + i * 20, 220, &FONT_S, b, C_WHITE, 0);
-    }
+    crash_screen(c, 0);
     t0 = fm1_ticks();
-    while ((uint32_t)(fm1_ticks() - t0) < 8000u * 1000u * FM1_TICKS_PER_US)
+    while ((uint32_t)(fm1_ticks() - t0) < 3000u * 1000u * FM1_TICKS_PER_US)
         fm1_wdt_feed();
     fm1_reboot();
+}
+/* After the reboot the report stays on screen until a key or button is pressed. */
+static void crash_report(void)
+{
+    uint32_t t0 = fm1_ms, held;
+    if (fm1_crash.magic != FM1_CRASH_MAGIC || fm1_crash.shown)
+        return;
+    crash_screen(&fm1_crash, 1);
+    lcd_sync();
+    fm1_delay_ms(400);
+    held = fm1_in.buttons | fm1_in.notes;
+    while (fm1_ms - t0 < 600000u) {
+        uint32_t now = fm1_in.buttons | fm1_in.notes;
+        fm1_wdt_feed();
+        if (now & ~held) break;
+        held &= now;
+    }
+    fm1_crash.shown = 1;
+    lcd_fill(0, 0, 240, 240, C_BLACK);
 }
 
 void fm1_cstart(void)
@@ -420,6 +455,7 @@ void fm1_cstart(void)
     fm1_timer5_start(isr_timer5, 4);
     fm1_guard_lock_top();
     fm1_irq_enable_all();
+    crash_report();
     app_main();
     for (;;)
         platform_poll();

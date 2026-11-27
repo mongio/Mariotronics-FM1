@@ -158,7 +158,7 @@ static void lfo2_view(void){
 /* ENSEMBLE: the moving delay taps, or the phaser's notches, drawn as they sweep. */
 static void modfx_view(void){
   static const char *const titles[]={"ENSEMBLE OFF","STRING ENSEMBLE","CHORUS","PHASER","FLANGER"};
-  int type=knob[MODFX][0],depth=knob[MODFX][2];
+  int post=knob[MODFX][0]>4,type=post?knob[MODFX][0]-4:knob[MODFX][0],depth=knob[MODFX][2];
   lettering(120,4,titles[type],type?gold:silver,0);
   unsigned ph=modfx.phase;
   int voices=type==1?3:type==2||type==4?2:type==3?4:0;
@@ -172,7 +172,7 @@ static void modfx_view(void){
     }
   }
   if(!type)lettering(120,64,"TURN K1 TO CHOOSE",metal,0);
-  lettering(120,120,type?"BEFORE THE TAPE, IN STEREO":"OFF",silver,0);
+  lettering(120,120,!type?"OFF":post?"POST  /  AFTER THE TAPE":"PRE  /  BEFORE THE TAPE",silver,0);
 }
 /* RING MOD (STOCKHAUSEN): carrier, modulator and their product. */
 static void ring_view(void){
@@ -200,7 +200,24 @@ static void instrument_diagram(void){
     }else for(int i=0;i<90;i++){int x=back?211-2*i:28+2*i;int h=(88-i)*(10+absolute(sinus(i*117000000u)))/240;cv_line(x,85-h,x,85+h,gold);}
     return;
   }
-  if(kind==PIANO || kind==BRIGHT || kind>=EVENING){
+  if(kind>=ABYSS && kind<=UMBRA){                /* 1.20: the dark pads, slow bands of colour under the title */
+    static const char *const titles[]={"ABYSS","NOCTURNE","UMBRA"};
+    static const uint16_t tint[3][3]={{RGB(18,30,52),RGB(34,58,96),RGB(86,120,170)},{RGB(36,22,44),RGB(70,42,86),RGB(150,104,160)},{RGB(30,26,20),RGB(66,54,36),RGB(176,140,90)}};
+    int i=kind-ABYSS,c=knob[TIMBRE][2];
+    lettering(120,6,titles[i],gold,0);
+    for(int band=0;band<3;band++){
+      int last=0;
+      for(int x=0;x<216;x+=2){
+        unsigned ph=(unsigned)x*(16000000u+band*9000000u)+fm1_ms*(unsigned)(3000+band*1700+c*900);
+        int y=72+band*12-sinus(ph)*(10+a*2-band*3)/127-sinus(ph*3u+fm1_ms*1100u)*(b+2)/127;
+        if(x){aa_line((10+x)*16,last*16,(12+x)*16,y*16,band==2?20:36,tint[i][band]);}
+        last=y;
+      }
+    }
+    lettering(70,119,timbre_labels[kind-PIANO][0],silver,0);lettering(172,119,timbre_labels[kind-PIANO][1],silver,0);
+    return;
+  }
+  if(kind==PIANO || kind==BRIGHT || (kind>=EVENING && kind<=TIDAL)){
     static const char *const titles[]={"ACOUSTIC PIANO","EVENING GLASS","DUSK CHOIR","TIDAL HAZE"};
     int face=kind>=EVENING?1+kind-EVENING:0;
     panel_text(-7,2,kind==BRIGHT?"BRIGHT PIANO":titles[face],RGB(237,236,228),226,95);

@@ -27,7 +27,6 @@
 #include "mt_piano.h"
 #include "mt_eno_bank.h"
 #include "mt_vu.h"
-#include "mt_global.h"
 
 #ifndef RING_PUBLISH
 #define RING_PUBLISH()                                                         \
@@ -39,7 +38,7 @@
 #define STRING_LEN 2048
 static int16_t tape[CAPACITY] POOLMEM;
 enum { STOP, RECORD, DUB, HOLD };
-enum { SINGING = 4, HOLLOW = 5, PIANO = 6, BRIGHT, GLASS_BELL, TAPE_CHOIR, RHODES, BOWED, ORGAN, REED, REED_ORGAN, HARMONIUM, BEATING, SUB_DRONE, VEIL, FIFTH, EVENING, DUSK, TIDAL, AIR };
+enum { SINGING = 4, HOLLOW = 5, PIANO = 6, BRIGHT, GLASS_BELL, TAPE_CHOIR, RHODES, BOWED, ORGAN, REED, REED_ORGAN, HARMONIUM, BEATING, SUB_DRONE, VEIL, FIFTH, EVENING, DUSK, TIDAL, ABYSS, NOCTURNE, UMBRA, AIR };
 enum { HOME, SOUND, ART, FUZZ, SCALE, WAH, AMP, PLATE, ENV, COMP, LFO, MIDI, BT, ARP, OFF_TAPE, LIGHTS, CHARACTER, EQ, FILTER, HEAD2, PICK_ART, ERASE, SPEED, TIMBRE, NOTE_FX, MOTION, UNCERT, ROUTE, FEEL, LFO2, MODFX, RING, PAGE_COUNT };
 static const char *const pages[] = {"TAPE", "INSTRUMENT", "PHRASING", "FUZZ", "SCALES", "WAH", "AMP", "PLATE", "ENV","COMP","LFO","MIDI","BLE MIDI","ARP","OFF-TAPE","KEYS","TAPE CHAR","EQ","FILTER","HEAD 2","ARP PICK","ERASE","SPEED","TIMBRE","NOTE FX","MOTION","SOURCE","ROUTING","ARP FEEL","LFO 2","ENSEMBLE","RING MOD"};
 static const char *const names[][4] = {{"Delay", "FDBK", "Send", "Return"},
@@ -50,10 +49,15 @@ static volatile int knob[][4] = {
 static const int maximum[][4] = {{80, 100, 100, 100},
                                  {1, 100, 4, 1},
                                  
-                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11, 12, 50},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8,1,1},{1,16,95,100},{100,100,100,180},{2,1,127,20},{100,100,100,100},{24,24,8,24},{2,100,100,100},{1,100,95,1},{100,100,1,24},{1,1,100,100},{96,1,100,50},{8,8,8,8},{1,16,95,100},{2,7,3,8},{1,2,8,8},{10,100,10,100},{50,3,100,4},{40,6,10,100},{4,100,100,100},{8,8,2,8}};
+                                 {1, 100, 80, 9}, {100, 100, 100, 100}, {2, 11, 12, 50},{100,100,100,100},{100,100,100,100},{100,100,100,80},{100,100,100,100},{100,8,100,100},{9,80,100,100},{16,1,1,16},{1,8,1,1},{1,16,95,100},{100,100,100,180},{2,1,127,20},{100,100,100,100},{24,24,8,24},{2,100,100,100},{1,100,95,1},{100,100,1,24},{1,1,100,100},{96,1,100,50},{8,8,8,8},{1,16,95,100},{2,7,3,8},{1,2,8,8},{10,100,10,100},{50,3,100,4},{40,6,10,100},{8,100,100,100},{8,8,2,8}};
 static const int minimum[][4] = {{40}, {0}, {0, 1, 0, 2}, {0}, {0,0,-12,-50},{0},{0},{0},{0},{0,1,0,0},{2,0,0,0},{0,0,0,1},{0},{0,-9,20,0},{0,0,0,20},{0,0,1,5},{0},{0},{0},{0,0,50,0},{0},{0},{0,0,0,-50},{0},{0,3,20,0},{0},{0},{0,-100,0,-100},{0,0,0,1},{0,0,0,-100},{0},{0}};
 static const char *const riley_voices[]={"ORGAN","REED","REED ORG","HARMON."};
-static const char *const ambient_voices[]={"PIANO","BRIGHT","GLASS","CHOIR","RHODES","BOW GL.","E.GLASS","D.CHOIR","T.HAZE"};
+static const char *const ambient_voices[]={"PIANO","PIANO","GLASS","CHOIR","RHODES","BOW GL.","E.GLASS","D.CHOIR","T.HAZE","ABYSS","NOCTURNE","UMBRA"};
+/* 1.20: the ENO voice menu. Stored numbers stay as they were (presets keep their voice); 1 was
+   Bright Piano and now plays the Piano. 9-11 are the dark pads. */
+enum { ENO_VOICES=11 };
+static const unsigned char eno_menu[ENO_VOICES]={0,4,2,3,5,6,7,8,9,10,11};
+static int eno_menu_pos(int stored){for(int i=0;i<ENO_VOICES;i++)if(eno_menu[i]==stored)return i;return 0;}
 static const char *const voices[] = {"SING", "HOLLOW"};
 static const char *const mode_names[] = {"CHROM", "DORIAN", "MAJOR"};
 static const char *const tonic_names[] = {"C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"};
@@ -77,8 +81,8 @@ static const char *const timbre_labels[][4]={
   {"Hammer","Body","Damper","Reson."},{"Hammer","Body","Damper","Reson."},{"Strike","Alloy","Octave","Sympath."},{"Wave","Air","Octave","Sympath."},
   {"Tine","Pickup","Octave","Sympath."},{"Bow","Glass","Octave","Sympath."},{"4 FT","2 2/3 FT","Perc","Leslie"},{"Edge","Breath","Perc","Leslie"},
   {"4 FT","Mixture","Perc","Leslie"},{"Bellows","Air","Perc","Leslie"},{"Beat","Color","Sub","Drift"},{"Beat","Color","Sub","Drift"},
-  {"Beat","Color","Sub","Drift"},{"Beat","Color","Sub","Drift"},{"Beat","Color","Drift","Shape"},{"Vowel","Blend","Drift","Air"},{"Noise","Tone","Swell","Drift"},{"Tune","Inertia","Material","Ring"}};
-static inline __attribute__((always_inline)) int voice_kind_now(void) { if(knob[SOUND][2]==4)return AIR;if(knob[SOUND][2]==1 && knob[SOUND][0]>=6)return EVENING+knob[SOUND][0]-6;return (knob[SOUND][2]==3 ? BEATING : knob[SOUND][2]==2 ? ORGAN : knob[SOUND][2]==1 ? PIANO : SINGING) + knob[SOUND][0]; }
+  {"Beat","Color","Sub","Drift"},{"Beat","Color","Sub","Drift"},{"Beat","Color","Drift","Shape"},{"Vowel","Blend","Drift","Air"},{"Noise","Tone","Swell","Drift"},{"Sub","Dark","Drift","Swell"},{"Spread","Tone","Motion","Air"},{"Hollow","Tone","Breath","Rumble"},{"Tune","Inertia","Material","Ring"}};
+static inline __attribute__((always_inline)) int voice_kind_now(void) { if(knob[SOUND][2]==4)return AIR;if(knob[SOUND][2]==1){int v=knob[SOUND][0];if(v>=9)return ABYSS+v-9;if(v>=6)return EVENING+v-6;if(v==1)return PIANO;}return (knob[SOUND][2]==3 ? BEATING : knob[SOUND][2]==2 ? ORGAN : knob[SOUND][2]==1 ? PIANO : SINGING) + knob[SOUND][0]; }
 static int voice_kind(void) { return voice_kind_now(); }
 /* Arpeggio rate: values 3..32 are whole hertz as before; below 3 the knob slows
    down in twelve steps to one step every 20 seconds. */
@@ -139,7 +143,7 @@ static unsigned char held_notes[128], held_counts[128];
 static int phrase_enabled;
 static int held_size;
 static unsigned serial;
-static inline __attribute__((always_inline)) unsigned note_frames(int kind){return kind==GLASS_BELL || kind==TAPE_CHOIR?36015u:(kind==PIANO || kind==BRIGHT?PIANO_FRAMES:43520u);}
+static inline __attribute__((always_inline)) unsigned note_frames(int kind){return kind==GLASS_BELL || kind==TAPE_CHOIR?36015u:kind==RHODES?64000u:(kind==PIANO || kind==BRIGHT?PIANO_FRAMES:43520u);}
 static inline __attribute__((always_inline)) unsigned timeline_step(int kind,int note){
   if(kind==GLASS_BELL || kind==TAPE_CHOIR){
     int root=36+8*bound((note-32)/8,0,7);
@@ -182,6 +186,7 @@ static void strike(int slot, int note, int velocity, int kind) {
     __builtin_memset(s->line,0,sizeof s->line);
     VoiceX *x=(VoiceX *)(void *)s->line;x->perc=32767;x->click=160;
   }
+  if(kind>=ABYSS && kind<=UMBRA){s->hammer_filter=s->damper=0;s->sample_pos=0x40000000u;}
   if(kind>=ORGAN){s->sample_wave=s->bell_phase=0;return;}
   if(kind>=PIANO) {
     s->at=-1;
@@ -348,6 +353,14 @@ static AUDIO_FAST void piano_block(String *s,unsigned block){
   }
   s->at=(int)block;
 }
+/* 2^(-x/256) in Q15, x >= 0: one octave of 33 points, linear in between. */
+static AUDIO_TABLE const unsigned short rhodes_exp_tab[33]={32767,32066,31379,30708,30048,29405,28774,28158,27554,26964,26386,25821,25268,24726,24196,23678,23170,22674,22188,21712,21247,20792,20346,19910,19484,19066,18658,18258,17867,17484,17109,16743,16384};
+static inline __attribute__((always_inline)) int rhodes_exp(int x){
+  if(x<0)x=0;
+  if(x>=256*15)return 0;
+  int f=x&255,i=f>>3,a=rhodes_exp_tab[i],b=rhodes_exp_tab[i+1];
+  return (a+((b-a)*(f&7)>>3))>>(x>>8);
+}
 static unsigned piano_rate(unsigned long long scaled,unsigned delay){return (unsigned)(scaled/delay);}
 static unsigned (*volatile piano_rate_p)(unsigned long long,unsigned) = piano_rate;
 static AUDIO_FAST int piano_tick(String *s) {
@@ -383,15 +396,28 @@ static AUDIO_FAST int piano_tick(String *s) {
     s->sample_wave+=s->sample_reverse ? -s->increment : s->increment;
     int tail=(int)(frames-1-elapsed)*256/(int)frames;
     if(s->kind==RHODES) {
-      /* Tine fundamental and short-lived flexural mode feed a nonlinear pickup. */
-      int dir=s->sample_reverse?-1:1;
-      s->bell_phase+=dir*(s->increment*6u+(s->increment>>2));
-      int edge=bound(256-(int)elapsed/14,0,256);
-      int tine=sinus(ph)*tail/2;
-      if(s->increment<0x11000000u)tine+=sinus(s->bell_phase)*edge*s->strength/1024;
-      sample=tine+(sinus(ph*2u)*tail/12)*s->strength/127;
-      sample+=((tine/128)*(tine/128)-4096)*s->strength*(knob[TIMBRE][1]+1)/1200;
-      sample=sample*bound(elapsed,0,40)/40*bound(frames-1-elapsed,0,700)/700;
+      /* 1.20 Rhodes: a struck tine and its tonebar ring with a pitch-dependent exponential
+         decay; the tine's inharmonic bending mode (x5.9) and a short metallic tick give the
+         attack; the magnetic pickup adds the asymmetric "bark" that grows with velocity
+         (Pickup knob). Every envelope is a function of the note's elapsed time, so reverse
+         notes still play backwards. */
+      int dir=s->sample_reverse?-1:1, note=bound(s->note,24,108), vel=bound((s->strength-2800)/36,1,127);
+      s->bell_phase+=dir*(int)(s->increment*5u+s->increment*9u/10u);
+      unsigned tick_ph=ph*16u+(ph>>2);
+      int t=(int)elapsed;
+      int e_tine=rhodes_exp(t*(24+(note-24)*73/84)>>10);            /* T60 ~10 s low, ~2.5 s high */
+      int e_bell=rhodes_exp(t*(600+(note-24)*3)>>10);                /* ~0.35 s */
+      int e_tick=rhodes_exp(t*9700>>10);                            /* ~25 ms */
+      int attack=bound(t,0,24)*256/24;                             /* 2 ms hammer contact */
+      int drive=72+vel*(4+knob[TIMBRE][1])/8;                       /* how close the tine swings to the pickup */
+      int amp=(int)((long long)127*e_tine*drive>>22);              /* +-127 at full */
+      int x=sinus(ph)*amp/127+sinus(ph*2u)*amp/(18+knob[TIMBRE][1]*2);
+      int bark=(x*x)/127-(amp*amp)/254;                            /* the pickup's even harmonics, DC removed */
+      x+=bark*(knob[TIMBRE][1]+1)*vel/(127*10);
+      int bell=sinus(s->bell_phase)*e_bell/32767*vel*(knob[TIMBRE][0]+2)/(127*6);
+      int tick=sinus(tick_ph)*e_tick/32767*vel/300;
+      sample=(x*66+bell*32+tick*20)*attack/256;
+      sample=sample*bound(frames-1-elapsed,0,700)/700;
     } else if(s->kind==BOWED){
       s->bell_phase+=s->sample_reverse?-s->increment-(s->increment>>10):s->increment+(s->increment>>10);
       int bow=bound(elapsed,0,3400);
@@ -436,7 +462,7 @@ static AUDIO_FAST int envelope_tick(String *s) {
   s->level=s->env_q8>>8;
   return s->level;
 }
-static const char *const motion_titles[]={"SOUNDBOARD","SOUNDBOARD","SHIMMER","CHORUS","TREMOLO","SHIMMER","ROTARY","AIR PULSE","ROTARY","BELLOWS","SLOW FADE","SLOW FADE","SLOW FADE","SLOW FADE","SHIMMER","CHORUS","AIR PULSE","AIR FLOW"};
+static const char *const motion_titles[]={"SOUNDBOARD","SOUNDBOARD","SHIMMER","CHORUS","TREMOLO","SHIMMER","ROTARY","AIR PULSE","ROTARY","BELLOWS","SLOW FADE","SLOW FADE","SLOW FADE","SLOW FADE","SHIMMER","CHORUS","AIR PULSE","SLOW FADE","CHORUS","AIR PULSE","AIR FLOW"};
 static AUDIO_FAST int motion_sample(String *s,int sample){
   int depth=knob[MOTION][1];
   if(!depth)return sample;
@@ -850,7 +876,7 @@ typedef struct {
   unsigned layer_length, sums[2], peaks[2];
   int layer_target, mix, decay, damping, predelay, wet, hf_coefficient, saturation, wow, flutter;
   int monitor_voice, monitor_mix, color_mod, level_mod, tape_rate, peak_in, peak_out;
-  int fx_type, fx_depth, fx_mix, off_level, off_tone, off_left, off_right, layer_reverse;
+  int fx_type, fx_post, fx_depth, fx_mix, off_level, off_tone, off_left, off_right, layer_reverse;
   unsigned fx_inc;
 } AudioBlock;
 /* ENSEMBLE page: string ensemble, chorus, phaser and flanger on the instrument,
@@ -904,7 +930,7 @@ static AUDIO_FAST void audio_loop(int32_t *out, uint32_t n, AudioBlock *b) {
   int hf_coefficient=b->hf_coefficient, saturation=b->saturation, wow=b->wow, flutter=b->flutter;
   int monitor_voice=b->monitor_voice, monitor_mix=b->monitor_mix;
   int color_mod=b->color_mod, level_mod=b->level_mod, tape_rate=b->tape_rate;
-  int fx_type=b->fx_type, fx_depth=b->fx_depth, fx_mix=b->fx_mix; unsigned fx_inc=b->fx_inc;
+  int fx_type=b->fx_type, fx_post=b->fx_post, fx_depth=b->fx_depth, fx_mix=b->fx_mix; unsigned fx_inc=b->fx_inc;
   int off_level=b->off_level, off_tone=b->off_tone, off_left=b->off_left, off_right=b->off_right, layer_reverse=b->layer_reverse;
   int peak_in=0, peak_out=0;
   unsigned sums0=0, sums1=0, peaks0=0, peaks1=0;
@@ -934,8 +960,8 @@ static AUDIO_FAST void audio_loop(int32_t *out, uint32_t n, AudioBlock *b) {
     if(phrase_enabled && phrase_wait) dry=0;
     else if(phrase_enabled && phrase_gain<1048576) dry=dry*(phrase_gain>>10)/1024;
     int dl=dry, dr=dry;
-    if(fx_type)mod_fx(dry,&dl,&dr,fx_type,fx_inc,fx_depth,fx_mix);
-    int send = (fx_type?(dl+dr)/2:dry) * knob[HOME][2] / 100, ret = 0;
+    if(fx_type && !fx_post)mod_fx(dry,&dl,&dr,fx_type,fx_inc,fx_depth,fx_mix);
+    int send = (fx_type && !fx_post?(dl+dr)/2:dry) * knob[HOME][2] / 100, ret = 0;
     if (transport != STOP) {
       ret = prev_return + (next_return - prev_return) * dec_n / 768;
       dec_sum += send;
@@ -997,6 +1023,11 @@ static AUDIO_FAST void audio_loop(int32_t *out, uint32_t n, AudioBlock *b) {
     if(off_tone<256){modfx.head_lp+=(head-modfx.head_lp)*off_tone/256;head=modfx.head_lp;}
     int common = ret * knob[HOME][3] / 100, off = head * off_level / 100;
     int mix_l = dl + common + off*off_left/100, mix_r = dr + common + off*off_right/100;
+    if(fx_type && fx_post){                       /* POST: the whole monitor (instrument, tape, off-tape) is modulated */
+      int centre=(mix_l+mix_r)/2,pl,pr;
+      mod_fx(centre,&pl,&pr,fx_type,fx_inc,fx_depth,fx_mix);
+      mix_l=pl+(mix_l-centre);mix_r=pr+(mix_r-centre);
+    }
     int mix = (mix_l==mix_r)?mix_l:(mix_l+mix_r)/2;
     if (plate_half) plate_tick((plate_input+mix)/4,decay,damping,predelay);
     plate_input=mix;
@@ -1074,7 +1105,7 @@ static void app_audio(int32_t *out, uint32_t n) {
       default:w=sinus(phase);
     }
     lfo2_amount=bound(w,-127,127)*knob[LFO2][3]/127;lfo2_phase=phase;lfo2_wave=bound(w,-127,127); }
-  b.fx_type=knob[MODFX][0];
+  b.fx_type=knob[MODFX][0]>4?knob[MODFX][0]-4:knob[MODFX][0]; b.fx_post=knob[MODFX][0]>4;   /* 1.20: 5-8 run after the tape */
   { int rate=bound(knob[MODFX][1]+rf_mod(RF_FXRATE),0,100);
     unsigned hz100=5u<<(rate/10);hz100+=hz100*(unsigned)(rate%10)/10;           /* 0.05 Hz .. about 50 Hz, doubling every 10 */
     if(hz100>1000)hz100=1000;
@@ -1167,7 +1198,7 @@ static const char *value_text(int k, char *s) {
     if(k==2)return rf_target_name(v);
     signed_text(s,v,0);return s;
   }
-  if(page==MODFX && k==0)return ((const char *const[]){"OFF","ENSEMBLE","CHORUS","PHASER","FLANGER"})[v];
+  if(page==MODFX && k==0)return ((const char *const[]){"OFF","ENS PRE","CHO PRE","PHA PRE","FLA PRE","ENS POST","CHO POST","PHA POST","FLA POST"})[v];
   if(page==RING && k==1)return ((const char *const[]){"1:2","3:4","1:1","5:4","3:2","2:1","5:2","3:1","3.71"})[v];
   if(page==RING && k==2)return ((const char *const[]){"STRIKE","BOW","SCRAPE"})[v];
   if(page==UNCERT){if(!k)return v?"ON":"OFF";if(k==1)return ((const char *const[]){"Drift","Steps","Pulse"})[v];if(k==2 && !v)return "Auto";}
@@ -1433,27 +1464,6 @@ static void stereo_vu(void) {
     lettering(cx,95,ch?"R":"L",silver,0);
   }
 }
-static void panel_art(const uint8_t *data,int x,int y,int lamp){
-  unsigned count=0;int col=0;
-  for(unsigned i=0;count<10000;i++){
-    int code=data[i],shade=code&15;
-    if(lamp>=0 && shade>=11 && lamp<2)shade=lamp?shade-2:5;
-    uint16_t color=swap16(panel_colors[shade]);
-    for(int n=0;n<=(code>>4);n++){
-      cv_px[y*240+x+col]=color;count++;
-      if(++col==100){col=0;y++;}
-    }
-  }
-}
-static void speed_dial(void){
-  panel_art(dial_art,70,21,-1);
-  int a=((-96+speed_index()*2)+256)&255;
-  int dx=sine256[a],dy=-sine256[(a+64)&255];
-  cv_line(120+dx*14/127,71+dy*14/127,120+dx*31/127,71+dy*31/127,gold);
-  lettering(46,83,"4.75",silver,0);lettering(74,3,"9.5",silver,0);
-  lettering(164,3,"19",silver,0);lettering(194,83,"38",silver,0);
-  lettering(120,123,"TAPE SPEED",silver,0);
-}
 /* Antialiased drawing on the canvas itself: no box, no different background. Units of 1/16 px. */
 static void aa_px(int x,int y,uint16_t c,int a){
   y+=cv_oy;
@@ -1489,6 +1499,55 @@ static void aa_line(int x0,int y0,int x1,int y1,int w,uint16_t c){
     int ex=px-vx*t/256,ey=py-vy*t/256;
     aa_px(x,y,c,coverage(w/2-isqrt32((unsigned)(ex*ex+ey*ey))));
   }
+}
+/* TAPE SPEED: a Revox A77 control knob drawn on the black panel itself, no box behind it.
+   A black fluted skirt that turns with the speed, a turned-aluminium cap (two soft
+   reflections opposite each other, fine lathe rings), a cream index line, and a printed
+   scale with the four standard speeds. */
+static void a77_knob(int cx,int cy,int angle){
+  enum { R_SKIRT=36, R_CAP=23 };
+  for(int y=cy-R_SKIRT-1;y<=cy+R_SKIRT+1;y++)for(int x=cx-R_SKIRT-1;x<=cx+R_SKIRT+1;x++){
+    int dx=x-cx,dy=y-cy,d2=dx*dx+dy*dy,d16=isqrt32((unsigned)(d2*256+(dx+dy)*16+128));
+    int edge=coverage(R_SKIRT*16-d16);
+    if(edge<=0)continue;
+    int r,g,b;
+    if(d16<=R_CAP*16+8){                         /* the cap: conical reflections and lathe rings */
+      int refl=d2?-2*dx*dy*128/d2:0;              /* -128..128, bright towards top-left and bottom-right */
+      int lum=150+refl*60/128+((d16>>4)%3==0?-10:4)-(d16>>4)*1;
+      if(d16>R_CAP*16-24)lum-=46;                 /* the chamfer */
+      lum=bound(lum,40,235);r=lum;g=lum;b=lum-6;
+      int c=coverage(R_CAP*16-d16);               /* blend into the skirt at the rim */
+      int s=26;r=(r*c+s*(256-c))>>8;g=(g*c+s*(256-c))>>8;b=(b*c+s*(256-c))>>8;
+    }else{                                        /* the skirt: glossy black, lit from above */
+      int lum=20-dy*10/R_SKIRT;
+      if(d16>(R_SKIRT-3)*16)lum+=10;              /* the rounded outer lip */
+      r=g=b=bound(lum,8,48);
+    }
+    aa_px(x,y,RGB(r,g,b),edge);
+  }
+  for(int i=0;i<36;i++){                          /* the flutes, turning with the knob */
+    int a=(angle+i*256/36)&255,sx=sine256[a],sy=-sine256[(a+64)&255];
+    int lit=sy<0?96:60;
+    aa_line(cx*16+sx*(R_CAP+4)*16/127,cy*16+sy*(R_CAP+4)*16/127,cx*16+sx*(R_SKIRT-2)*16/127,cy*16+sy*(R_SKIRT-2)*16/127,14,RGB(lit,lit,lit-2));
+  }
+  int sx=sine256[angle&255],sy=-sine256[(angle+64)&255];
+  aa_line(cx*16+sx*(R_CAP+2)*16/127,cy*16+sy*(R_CAP+2)*16/127,cx*16+sx*(R_SKIRT-1)*16/127,cy*16+sy*(R_SKIRT-1)*16/127,40,RGB(243,236,211));
+  aa_line(cx*16+sx*5*16/127,cy*16+sy*5*16/127,cx*16+sx*(R_CAP-4)*16/127,cy*16+sy*(R_CAP-4)*16/127,28,RGB(58,56,52));
+}
+static void speed_dial(void){
+  enum { CX=120, CY=70 };
+  for(int i=0;i<=96;i+=4){                        /* the printed scale */
+    int a=(-96+i*2+256)&255,sx=sine256[a],sy=-sine256[(a+64)&255],major=!(i%32);
+    int r0=major?41:43,r1=major?49:46;
+    aa_line(CX*16+sx*r0*16/127,CY*16+sy*r0*16/127,CX*16+sx*r1*16/127,CY*16+sy*r1*16/127,major?24:12,major?silver:RGB(120,118,108));
+  }
+  { static const char *const mark[4]={"4.75","9.5","19","38"};
+    for(int i=0;i<4;i++){
+      int a=(-96+i*64+256)&255,sx=sine256[a],sy=-sine256[(a+64)&255];
+      lettering(CX+sx*64/127,CY+sy*60/127-8,mark[i],speed_index()==i*32?gold:silver,0);
+    } }
+  a77_knob(CX,CY,((-96+speed_index()*2)+256)&255);
+  lettering(120,123,"TAPE SPEED",silver,0);
 }
 static unsigned midi_seen;                          /* last MIDI input, for the connector's pins */
 /* MIDI: a 5-pin DIN socket in outline; the pins light while MIDI arrives. */
@@ -1755,7 +1814,8 @@ static void draw(void) {
   cv_rect(start,19,width,2,gold);
   for (int k = 0; k < 4; k++) {
     int x = 30 + 60 * k;                          /* every page has four knobs */
-    int v = knob[page][k], lo = minimum[page][k], hi = page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?8:(knob[SOUND][2]==4?0:3)):maximum[page][k];
+    int v = knob[page][k], lo = minimum[page][k], hi = page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?ENO_VOICES-1:(knob[SOUND][2]==4?0:3)):maximum[page][k];
+    if(page==SOUND && !k && knob[SOUND][2]==1)v=eno_menu_pos(v);
     if(page==SPEED && !k && !knob[SPEED][1])hi=3;
     vintage_knob(x,41,v-lo,hi-lo);
     char val[8];
@@ -1965,7 +2025,7 @@ static void set_control(int k,int v) {
   }
   
   int old_kind=voice_kind();
-  knob[page][k]=bound(v,minimum[page][k],page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?8:(knob[SOUND][2]==4?0:3)):maximum[page][k]);
+  knob[page][k]=bound(v,minimum[page][k],page==ARP && !k && knob[SOUND][2]?4:page==SOUND && !k && knob[SOUND][2]? (knob[SOUND][2]==1?11:(knob[SOUND][2]==4?0:3)):maximum[page][k]);
   if(page==SOUND && !k && voice_kind()!=old_kind){  /* a different voice: its extra TIMBRE knobs start from their defaults */
     if(new_timbre_kind(voice_kind()))knob[TIMBRE][2]=knob[TIMBRE][3]=0;
     else if(new_timbre_kind(old_kind))knob[TIMBRE][2]=knob[TIMBRE][3]=4;
@@ -2058,6 +2118,9 @@ static unsigned latched_keys(void){       /* keys whose current pitch is held, f
   return bits;
 }
 static void app_step(void) {
+#if !defined(GRANA_WEB) && !defined(DINGHY_HOST)
+  fm1_app_ctx=(unsigned)page|(unsigned)knob[SOUND][2]<<8|(unsigned)knob[SOUND][0]<<12|(unsigned)(knob[UNCERT][0]!=0)<<20|(unsigned)transport<<24|(unsigned)(eno_version&15)<<28;
+#endif
   static unsigned key_prev, last_frame, rec_started;
   static int rec_pending;
   unsigned rel = 0, edge = fm1_input_edges(&rel), keys = fm1_in.notes;
@@ -2140,6 +2203,7 @@ static void app_step(void) {
   for (int k = 0; k < 4; k++) {
     d = fm1_enc_take(ENC_KNOB1 + k);
     if(d && naming) edit_name(k,d);
+    else if(d && page==SOUND && !k && knob[SOUND][2]==1)set_control(k,eno_menu[bound(eno_menu_pos(knob[SOUND][0])+d,0,ENO_VOICES-1)]);   /* ENO: K1 walks the voice menu */
     else if(d) set_control(k,knob[page][k]+d);
   }
   for (int k = 0; k < 27; k++)
