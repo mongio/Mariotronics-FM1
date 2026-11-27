@@ -129,6 +129,66 @@ static void route_view(void){
   route_bar(78,knob[ROUTE][2],knob[ROUTE][3],rf_amount2);
   lettering(120,124,!knob[UNCERT][0]?"SOURCE OFF":"TWO ROUTES",silver,0);
 }
+/* LFO 2: one cycle of the chosen shape, the moving point, and where it goes. */
+static int lfo2_shape_at(int shape,unsigned ph){
+  switch(shape){
+    case 1:return ph<0x80000000u?(int)(ph>>23)-128:383-(int)(ph>>23);
+    case 2:return (int)(ph>>24)-128;
+    case 3:return 127-(int)(ph>>24);
+    case 4:return ph<0x80000000u?120:-120;
+    case 5:case 6:return (int)((ph>>29)*2654435761u>>24)-128;
+    default:return sinus(ph);
+  }
+}
+static void lfo2_view(void){
+  lettering(120,4,"LFO 2",gold,0);
+  int shape=knob[LFO2][1],depth=knob[LFO2][3],prev=0;
+  cv_rect(16,66,208,1,RGB(40,42,38));
+  for(int x=0;x<=208;x+=2){
+    int y=66-lfo2_shape_at(shape,(unsigned)x*20648881u)*34/127;
+    if(x)aa_line((14+x)*16,prev*16,(16+x)*16,y*16,22,depth?silver:metal);
+    prev=y;
+  }
+  int at=(int)(lfo2_phase>>24)*208/256;
+  aa_disc((16+at)*16,(66-lfo2_wave*34/127)*16,5*16,gold,256);
+  char s[16];s[0]=depth<0?'-':'+';number(s+1,absolute(depth));
+  lettering(-18,116,rf_target_name(knob[LFO2][2]),silver,0);
+  lettering(-186,116,s,depth?gold:metal,0);
+}
+/* ENSEMBLE: the moving delay taps, or the phaser's notches, drawn as they sweep. */
+static void modfx_view(void){
+  static const char *const titles[]={"ENSEMBLE OFF","STRING ENSEMBLE","CHORUS","PHASER","FLANGER"};
+  int type=knob[MODFX][0],depth=knob[MODFX][2];
+  lettering(120,4,titles[type],type?gold:silver,0);
+  unsigned ph=modfx.phase;
+  int voices=type==1?3:type==2||type==4?2:type==3?4:0;
+  for(int v=0;v<voices;v++){
+    unsigned offset=type==1?(unsigned)v*0x55555555u:type==3?(unsigned)v*0x40000000u:(unsigned)v*0x80000000u;
+    int prev=0;
+    for(int x=0;x<=208;x+=2){
+      int y=68+sinus((unsigned)x*41297762u+ph*(type==3?1u:2u)+offset)*(type==3?10:18)*depth/(127*100)+(v-voices/2)*(type==3?14:8);
+      if(x)aa_line((14+x)*16,prev*16,(16+x)*16,y*16,v?16:24,v?RGB(150,128,90):gold);
+      prev=y;
+    }
+  }
+  if(!type)lettering(120,64,"TURN K1 TO CHOOSE",metal,0);
+  lettering(120,120,type?"BEFORE THE TAPE, IN STEREO":"OFF",silver,0);
+}
+/* RING MOD (STOCKHAUSEN): carrier, modulator and their product. */
+static void ring_view(void){
+  static const unsigned short ratio_q8[]={128,192,256,320,384,512,640,768,950};
+  static const char *const excite[]={"STRIKE","BOW","SCRAPE"};
+  lettering(120,4,"RING MODULATOR",gold,0);
+  int amount=knob[RING][0],py=0,pm=0,pp=0;
+  for(int x=0;x<=208;x+=2){
+    unsigned a=(unsigned)x*41297762u,b=(unsigned)((unsigned long long)a*ratio_q8[knob[RING][1]]>>8);
+    int c=sinus(a),m=sinus(b),y1=40-c*12/127,y2=74-m*12/127,y3=110-(c*(8-amount)+c*m/127*amount)/8*14/127;
+    if(x){aa_line((14+x)*16,py*16,(16+x)*16,y1*16,16,metal);aa_line((14+x)*16,pm*16,(16+x)*16,y2*16,16,RGB(150,128,90));
+          aa_line((14+x)*16,pp*16,(16+x)*16,y3*16,24,amount?gold:silver);}
+    py=y1;pm=y2;pp=y3;
+  }
+  lettering(120,128,excite[knob[RING][2]],silver,0);
+}
 static void instrument_diagram(void){
   int kind=voice_kind(),a=knob[TIMBRE][0],b=knob[TIMBRE][1];
   if(page==HEAD2 || page==NOTE_FX){

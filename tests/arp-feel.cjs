@@ -37,7 +37,7 @@ const load=f=>WebAssembly.compile(Buffer.from(fs.readFileSync(f,'utf8').match(/w
   e.w.midi(128,60,0);e.tick();
 
   // Two routes.
-  e.press(5);e.press(5);e.press(5);                                  // LFO -> SOURCE -> ROUTING
+  e.press(5);e.press(5);e.press(5);e.press(5);                                  // LFO -> SOURCE -> ROUTING
   e.w.set_param(0,3);e.w.set_param(1,80);e.w.set_param(2,7);e.w.set_param(3,-60);e.tick();
   assert.deepEqual([0,1,2,3].map(k=>e.w.param(k)),[3,80,7,-60]);
   e.save();
@@ -46,7 +46,7 @@ const load=f=>WebAssembly.compile(Buffer.from(fs.readFileSync(f,'utf8').match(/w
   e=await boot(e.store.slice());e.select(5);
   e.press(10);e.press(10);
   assert.deepEqual([0,1,2,3].map(k=>e.w.param(k)),[50,3,40,3],'ARP FEEL recalled');
-  e.press(5);e.press(5);e.press(5);
+  e.press(5);e.press(5);e.press(5);e.press(5);
   assert.deepEqual([0,1,2,3].map(k=>e.w.param(k)),[3,80,7,-60],'both routes recalled');
 
   // A bank written by Lab 6 loads with the defaults.

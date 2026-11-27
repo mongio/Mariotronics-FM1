@@ -5,7 +5,7 @@ import math
 S=4; W=100; H=100
 palette=['101111','1e201f','303331','40413c','575951','72766e','93978d','b9bbad','dddecb','f3ecd3','593625','94623d','bf844a','f5c474','ffe7a0','fff4ce']
 out=['static const uint16_t panel_colors[]={'+','.join('RGB('+','.join(str(int(c[a:a+2],16)) for a in [0,2,4])+')' for c in palette)+'};']
-for name in ['dial','din','bulb']:
+for name in ['dial']:   # the MIDI and KEYS icons are drawn in the firmware (Lab 8)
  im=Image.new('RGB',(W*S,H*S),'#'+palette[0]);d=ImageDraw.Draw(im)
  def shape(coords):return tuple(round(n*S) for n in coords)
  def circ(coords,c):d.ellipse(shape(coords),fill='#'+palette[c])

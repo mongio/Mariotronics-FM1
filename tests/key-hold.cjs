@@ -21,7 +21,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
   w.keys(0);tick();assert.deepEqual(messages(),[]);
   w.keys(4);tick();w.keys(0);tick();assert.deepEqual(messages(),[144]);
   w.keys(8);tick();w.keys(0);tick();assert.deepEqual(messages(),[144]);
-  w.keys(1);tick();w.keys(0);tick();assert.deepEqual(messages(),[]);       // already held: no retrigger
+  w.keys(1);tick();w.keys(0);tick();assert.deepEqual(messages(),[128,144]); // already held, RESTART: it starts again
   press(HOME,LONG);assert.deepEqual(messages(),[128,128,128,128]);
 
   // Armed with no key down: a melody accumulates, nothing is released until HOME again.
@@ -38,6 +38,17 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
   press(HOME,LONG);assert.deepEqual(messages(),[128]);
   w.keys(0);tick();assert.deepEqual(messages(),[128]);
 
+  // KEYS Hold Key RELEASE (as GRANA): a held note pressed again ends; a new one joins.
+  for(let i=0;i<7 && w.page()!==15;i++){w.button(7,1);tick();w.button(7,0);tick();}   // GLO up to KEYS
+  assert.equal(w.page(),15);w.set_param(1,1);tick();
+  press(HOME,LONG);
+  w.keys(1);tick();w.keys(0);tick();w.keys(2);tick();w.keys(0);tick();assert.deepEqual(messages(),[144,144]);
+  w.keys(1);tick();assert.deepEqual(messages(),[128]);w.keys(0);tick();assert.deepEqual(messages(),[]);
+  press(HOME,LONG);assert.deepEqual(messages(),[128]);
+  // KEYS Velocity and Hold time.
+  w.set_param(2,64);w.set_param(3,5);tick();
+  press(HOME,90);w.keys(4);tick();w.keys(0);tick();assert.deepEqual(messages(),[144]);press(HOME,90);assert.deepEqual(messages(),[128]);
+  w.set_param(1,0);w.set_param(2,110);w.set_param(3,10);tick();
   press(HOME,1);assert.equal(w.page(),0);
-  console.log('Keyboard HOLD: 1 s arm, chord and later notes latched, octave change, key held at release, short HOME verified.');
+  console.log('Keyboard HOLD: 1 s arm, chord and later notes latched, RESTART and RELEASE (GRANA logic), octave change, key held at release, velocity, hold time, short HOME verified.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

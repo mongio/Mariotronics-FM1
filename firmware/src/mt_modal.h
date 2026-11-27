@@ -12,7 +12,7 @@
 enum { MODE_COUNT = 6, MODE_FRAC = 6, MODE_LIMIT = 12000 };
 typedef long long modal_i64;
 typedef struct { int x, y, cosine, sine, gain; } AirMode;
-typedef struct { AirMode mode[MODE_COUNT]; unsigned next_hit, tuned_pitch; int material, ring, room, gain_sum; } AirBody;
+typedef struct { AirMode mode[MODE_COUNT]; unsigned next_hit, tuned_pitch, ring_phase; int material, ring, room, gain_sum; } AirBody;
 static AirBody air_bodies[4];
 
 static inline __attribute__((always_inline)) int modal_mul(int a, int b) { return (int)(((modal_i64)a * b + (1 << 29)) >> 30); }
@@ -81,11 +81,14 @@ static AUDIO_FAST int air_modal_tick(String *s) {
     }
     if (!(clock & 63)) tune_body(body, s);
     int force = 0;
+    int excite = knob[RING][2];                     /* RING MOD Excite: 0 strike, 1 bow, 2 scrape */
     if (s->gate && body->room > 0) {
         int noise = rnd();
+        if (excite == 1) body->next_hit = 1;        /* bowed: no strikes, only friction */
         if (!body->next_hit) {
             force = clock ? (900 + air_level * 8 + air_noise * 5) : 3800;
             body->next_hit = (unsigned)(18000 + (noise + 32768) / 2) / (1u + (unsigned)air_noise / 4u);
+            if (excite == 2) { force = clock ? 260 + (noise & 511) : 1600; body->next_hit = 220 + ((unsigned)noise & 1023); }
             /* An impulse raises the summed mode amplitude by force*gain_sum. */
             int cap = (body->room << 15) / body->gain_sum;              /* room <= 12000: fits */
             if (force > cap) force = cap;
@@ -93,7 +96,7 @@ static AUDIO_FAST int air_modal_tick(String *s) {
         --body->next_hit;
         /* Friction: 0.0005 + traffic*(32+level)*9e-8 per unit of noise, faded as the body fills. */
         int friction = (int)(((modal_i64)noise * (8389 + air_noise * (32 + air_level) * 3 / 2)) >> 24);
-        force += friction * body->room / MODE_LIMIT;
+        force += friction * body->room / MODE_LIMIT * (excite == 1 ? 14 : 1);
     } else if (s->gate && body->next_hit) --body->next_hit;
     int out = 0;
     for (int i = 0; i < MODE_COUNT; ++i) {
@@ -107,5 +110,10 @@ static AUDIO_FAST int air_modal_tick(String *s) {
     out >>= MODE_FRAC;
     if (out > 3 * MODE_LIMIT) out = 3 * MODE_LIMIT; else if (out < -3 * MODE_LIMIT) out = -3 * MODE_LIMIT;
     /* Linear output: the old instantaneous compressor intermodulated the inharmonic modes. */
+    if (knob[RING][0]) {                            /* ring modulator at a ratio of the note */
+        static const unsigned short ratio_q8[] = {128,192,256,320,384,512,640,768,950};
+        body->ring_phase += (s->increment >> 8) * ratio_q8[knob[RING][1]];
+        out += (out * sinus(body->ring_phase) / 127 - out) * knob[RING][0] / 8;
+    }
     return out * (s->strength * 9 / 64) / 1000;                   /* strength*9/64000, in 32 bits */
 }

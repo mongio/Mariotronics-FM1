@@ -25,6 +25,8 @@ const source = fs.readFileSync(process.argv[2], 'utf8');
   const fresh=(await WebAssembly.instantiate(Buffer.from(source.match(/wasm='([^']+)'/)[1],'base64'))).instance.exports;
   new Uint8Array(fresh.memory.buffer,fresh.store(),fresh.store_len()).set(bank); fresh.init();
   assert.equal(fresh.voice(),23);fresh.button(6,1);fresh.step(10);fresh.button(6,0);fresh.step(20);
-  fresh.button(6,1);fresh.step(30);assert.deepEqual([0,1,2,3].map(k=>fresh.param(k)),[1,0,8,7]);
+  fresh.button(6,1);fresh.step(30);fresh.button(6,0);fresh.step(40);
+  for(let i=0;i<3 && fresh.page()!==23;i++){fresh.button(6,1);fresh.step(50+i*20);fresh.button(6,0);fresh.step(60+i*20);}   // EDIT: TIMBRE <-> RING MOD
+  assert.equal(fresh.page(),23);assert.deepEqual([0,1,2,3].map(k=>fresh.param(k)),[1,0,8,7]);
   console.log('AIR scan, source lock, freeze, tape transport and preset recall passed.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

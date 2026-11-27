@@ -10,6 +10,7 @@ async function run(engine,target,depth,backup,second){
   if(!backup){w.enc(1,engine);tick();}
   press(5);assert.equal(w.page(),10);
   const vib=w.state()&512;press(3);assert.notEqual(w.state()&512,vib);press(3);
+  press(5);assert.equal(w.page(),29);   /* LFO 2 */
   press(5);assert.equal(w.page(),26);
   if(!backup){w.set_param(0,1);w.set_param(1,0);w.set_param(2,1);w.set_param(3,0);}
   for(let i=0;i<620;i++)tick();assert(w.rf_count()>0);

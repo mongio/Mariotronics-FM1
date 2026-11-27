@@ -110,33 +110,67 @@ static void apply_tone(const TonePatch *t) {
   int z=bound(packed>>13,0,200);knob[ROUTE][1]=(z&1)?-(z+1)/2:z/2;
   rf_amount=rf_amount2=rf_source=0;
 }
+/* Lab 8 controls stored in ExtraPatch.more (zero = default). */
+/* more[]: each control stored as its distance from the default, so zeros recall the defaults. */
+static void capture_more(signed char *m){
+  int air=voice_kind()==AIR;
+  m[0]=knob[SCALE][2];m[1]=knob[SCALE][3];
+  m[2]=100-knob[OFF_TAPE][1];m[3]=knob[OFF_TAPE][2]-50;m[4]=180-knob[OFF_TAPE][3];
+  m[5]=100-knob[HEAD2][1];m[6]=knob[HEAD2][2]-73;m[7]=knob[HEAD2][3];
+  if(air){m[8]=knob[RING][0];m[9]=knob[RING][1]-2;m[10]=knob[RING][2];m[11]=knob[RING][3];}
+  else{m[8]=new_timbre_kind(voice_kind())?knob[TIMBRE][2]:0;m[9]=new_timbre_kind(voice_kind())?knob[TIMBRE][3]:0;m[10]=knob[MOTION][2];m[11]=knob[MOTION][3];}
+  m[12]=knob[LFO2][0]-12;m[13]=knob[LFO2][1];m[14]=knob[LFO2][2]-4;m[15]=knob[LFO2][3];
+  m[16]=knob[MODFX][0];m[17]=knob[MODFX][1]-30;m[18]=knob[MODFX][2]-50;m[19]=knob[MODFX][3]-50;
+  m[20]=m[21]=m[22]=0;
+}
+static void apply_more(const signed char *m){
+  static const signed char zero[23];
+  if(!m)m=zero;
+  int kind=voice_kind();
+  knob[SCALE][2]=bound(m[0],-12,12);knob[SCALE][3]=bound(m[1],-50,50);
+  knob[OFF_TAPE][1]=bound(100-m[2],0,100);knob[OFF_TAPE][2]=bound(50+m[3],0,100);knob[OFF_TAPE][3]=bound(180-m[4],20,180);
+  knob[HEAD2][1]=bound(100-m[5],0,100);knob[HEAD2][2]=bound(73+m[6],50,95);knob[HEAD2][3]=bound(m[7],0,1);
+  if(kind==AIR){knob[RING][0]=bound(m[8],0,8);knob[RING][1]=bound(2+m[9],0,8);knob[RING][2]=bound(m[10],0,2);knob[RING][3]=bound(m[11],0,8);knob[MOTION][2]=knob[MOTION][3]=0;}
+  else{
+    if(new_timbre_kind(kind)){knob[TIMBRE][2]=bound(m[8],0,8);knob[TIMBRE][3]=bound(m[9],0,8);}
+    knob[MOTION][2]=bound(m[10],0,3);knob[MOTION][3]=bound(m[11],0,8);
+    knob[RING][0]=0;knob[RING][1]=2;knob[RING][2]=knob[RING][3]=0;
+  }
+  knob[LFO2][0]=bound(12+m[12],0,40);knob[LFO2][1]=bound(m[13],0,6);knob[LFO2][2]=bound(4+m[14],0,10);knob[LFO2][3]=bound(m[15],-100,100);
+  knob[MODFX][0]=bound(m[16],0,4);knob[MODFX][1]=bound(30+m[17],0,100);knob[MODFX][2]=bound(50+m[18],0,100);knob[MODFX][3]=bound(50+m[19],0,100);
+}
 /* Lab 7 settings beside each program: ARP FEEL and the full Wi-Fi routing.
    A record without the tag (older banks, older backups padded with zeros) recalls the defaults. */
-typedef struct { unsigned char tag, swing, accent, human, repeats, target_a, target_b; signed char amount_b; } ExtraPatch;
+typedef struct { unsigned char tag, swing, accent, human, repeats, target_a, target_b; signed char amount_b; unsigned char arp_slow; signed char more[23]; } ExtraPatch;
 enum { EXTRA_TAG=0xA7 };
-static ExtraPatch extra_bank[PROGRAM_COUNT] POOLMEM, extra_working[5];
+static ExtraPatch extra_bank[PROGRAM_COUNT] POOLMEM, extra_working[5] POOLMEM;
 static const ExtraPatch no_extra;
 static void capture_extra(ExtraPatch *e) {
   e->tag=EXTRA_TAG;e->swing=knob[FEEL][0];e->accent=knob[FEEL][1];e->human=knob[FEEL][2];e->repeats=knob[FEEL][3];
   e->target_a=knob[ROUTE][0];e->target_b=knob[ROUTE][2];e->amount_b=(signed char)knob[ROUTE][3];
+  e->arp_slow=knob[ARP][1]<3?(unsigned char)(3-knob[ARP][1]):0;   /* the patch keeps 3 Hz */
+  capture_more(e->more);
 }
 static void apply_extra(const ExtraPatch *e) {
-  if(e->tag!=EXTRA_TAG){knob[FEEL][0]=0;knob[FEEL][1]=1;knob[FEEL][2]=0;knob[FEEL][3]=1;knob[ROUTE][2]=4;knob[ROUTE][3]=0;return;}
+  if(e->tag!=EXTRA_TAG){knob[FEEL][0]=0;knob[FEEL][1]=1;knob[FEEL][2]=0;knob[FEEL][3]=1;knob[ROUTE][2]=4;knob[ROUTE][3]=0;apply_more(0);return;}
   knob[FEEL][0]=bound(e->swing,0,50);knob[FEEL][1]=bound(e->accent,0,3);knob[FEEL][2]=bound(e->human,0,100);knob[FEEL][3]=bound(e->repeats,1,4);
-  knob[ROUTE][0]=bound(e->target_a,0,8);knob[ROUTE][2]=bound(e->target_b,0,8);knob[ROUTE][3]=bound(e->amount_b,-100,100);
+  knob[ROUTE][0]=bound(e->target_a,0,10);knob[ROUTE][2]=bound(e->target_b,0,10);knob[ROUTE][3]=bound(e->amount_b,-100,100);
+  if(e->arp_slow && knob[ARP][1]==3)knob[ARP][1]=3-bound(e->arp_slow,1,12);
+  apply_more(e->more);
 }
 static void capture_patch(Patch *p) {
   for (unsigned i=0;i<sizeof patch_pages;i++)
     for(int k=0;k<4;k++) p->values[i][k]=knob[patch_pages[i]][k];
   /* The high bit distinguishes tenths-of-a-second patches from legacy SWELL patches. */
   p->values[12][1]=knob[HEAD2][0]; /* spare OFF_TAPE byte in existing patches */
+  if(knob[ARP][1]<3)p->values[11][1]=3;   /* slow rates live in the Lab record */
   /* Unused SCALE and OFF_TAPE controls keep the stored patch size compatible. */
   for(int k=0;k<4;k++)p->values[k<2?4:12][2+(k%2)]=knob[PICK_ART][k];
   p->vibrato=224|vib_on;
   if(knob[SOUND][2]){
     p->vibrato|=16|(knob[MOTION][1]<<1);
     p->values[4][2]=knob[MOTION][0]*81+knob[TIMBRE][0]*9+knob[TIMBRE][1];
-    p->values[4][3]=knob[ARP][0]*16+knob[ARP][1]-3;
+    p->values[4][3]=knob[ARP][0]*16+(knob[ARP][1]<3?3:knob[ARP][1])-3;
     p->values[12][2]=knob[ARP][2];p->values[12][3]=knob[ARP][3];
     if(voice_kind()==AIR){p->values[1][0]=0;p->values[1][2]=3;p->values[12][1]=128+knob[TIMBRE][2]*9+knob[TIMBRE][3];}
     if(knob[SOUND][2]==1)p->values[2][2]=128+knob[TIMBRE][2]*9+knob[TIMBRE][3];
@@ -203,6 +237,8 @@ static void switch_engine(int next) {
   if(!working_valid[next] && next==3){knob[ENV][0]=88;knob[ENV][2]=100;knob[ENV][3]=85;}
   if(!working_valid[next] && next==4){knob[TIMBRE][0]=0;knob[ENV][0]=24;knob[ENV][2]=100;knob[ENV][3]=55;}
   knob[SOUND][2]=next;
+  if(!working_valid[next] && new_timbre_kind(voice_kind()))knob[TIMBRE][2]=knob[TIMBRE][3]=0;   /* Lab 8 extras start off */
+  if(page==RING && next!=4)page=TIMBRE;
   if(page==PICK_ART && next!=0)page=ARP;
   if(page==FEEL && (next==0 || next==4))page=ARP;
   if((page==NOTE_FX || page==HEAD2) && next!=1)page=SOUND;
@@ -249,15 +285,22 @@ static unsigned bank_hash(unsigned generation,int with_names) {
     for(unsigned i=0;i<sizeof names_saved;i++) hash=(hash^bytes[i])*16777619u;
   }
   if(with_names>=2){bytes=(const unsigned char *)tone_bank;for(unsigned i=0;i<sizeof tone_bank;i++)hash=(hash^bytes[i])*16777619u;}
-  if(with_names==3){bytes=(const unsigned char *)extra_bank;for(unsigned i=0;i<sizeof extra_bank;i++)hash=(hash^bytes[i])*16777619u;}
+  if(with_names>=3){   /* Lab 7 wrote 8-byte records, Lab 8 writes 32 */
+    unsigned n=with_names==3?PROGRAM_COUNT*8:sizeof extra_bank;
+    bytes=(const unsigned char *)extra_bank;for(unsigned i=0;i<n;i++)hash=(hash^bytes[i])*16777619u;}
   return hash;
 }
 #define PRESET_MAGIC 0x3150544du
 #define NAMED_MAGIC 0x3250544du
 #define TONE_MAGIC 0x3350544du
 #define EXTRA_MAGIC 0x3450544du
-static int bank_magic(unsigned magic){return magic==PRESET_MAGIC || magic==NAMED_MAGIC || magic==TONE_MAGIC || magic==EXTRA_MAGIC;}
-static int bank_level(unsigned magic){return magic==EXTRA_MAGIC?3:magic==TONE_MAGIC?2:magic==NAMED_MAGIC;}
+#define EXTRA2_MAGIC 0x3550544du
+static int bank_magic(unsigned magic){return magic==PRESET_MAGIC || magic==NAMED_MAGIC || magic==TONE_MAGIC || magic==EXTRA_MAGIC || magic==EXTRA2_MAGIC;}
+static int bank_level(unsigned magic){return magic==EXTRA2_MAGIC?4:magic==EXTRA_MAGIC?3:magic==TONE_MAGIC?2:magic==NAMED_MAGIC;}
+static void widen_extras(void){   /* Lab 7 records (8 bytes) to Lab 8 (32 bytes), in place */
+  unsigned char *b=(unsigned char *)extra_bank;
+  for(int i=PROGRAM_COUNT-1;i>=0;i--){for(int k=31;k>=8;k--)b[i*32+k]=0;for(int k=7;k>=0;k--)b[i*32+k]=b[i*8+k];}
+}
 static void programs_init(void) {
   capture_patch(&initial_patch);
   BankHeader h[2]={{0}};
@@ -268,7 +311,7 @@ static void programs_init(void) {
     if(bank_magic(h[i].magic) && !user_read(i*4096+sizeof h[i],&bank,sizeof bank)
        && (h[i].magic==PRESET_MAGIC || !user_read(8192+i*4096,names_saved,sizeof names_saved))
        && (bank_level(h[i].magic)<2 || !user_read(8192+i*4096+sizeof names_saved,tone_bank,sizeof tone_bank))
-       && (bank_level(h[i].magic)<3 || !user_read(8192+i*4096+sizeof names_saved+sizeof tone_bank,extra_bank,sizeof extra_bank))
+       && (bank_level(h[i].magic)<3 || !user_read(8192+i*4096+sizeof names_saved+sizeof tone_bank,extra_bank,bank_level(h[i].magic)==3?PROGRAM_COUNT*8:sizeof extra_bank))
        && bank_hash(h[i].generation,bank_level(h[i].magic))==h[i].checksum) {
       bank_sector=i; bank_generation=h[i].generation; break;
     }
@@ -278,6 +321,7 @@ static void programs_init(void) {
     for(int i=0;i<PROGRAM_COUNT;i++) names_saved[i][0]=0;
   if(bank_sector<0 || bank_level(h[bank_sector].magic)<2) for(int i=0;i<PROGRAM_COUNT;i++)tone_bank[i]=neutral_tone;
   if(bank_sector<0 || bank_level(h[bank_sector].magic)<3) for(int i=0;i<PROGRAM_COUNT;i++)extra_bank[i]=no_extra;
+  else if(bank_level(h[bank_sector].magic)==3)widen_extras();
   recall_program(0);
   program_notice=0;
 }
@@ -294,7 +338,7 @@ static void save_program(void) {
   }
   int target=bank_sector==0?1:0;
   unsigned offset=target*4096, generation=bank_generation+1;
-  BankHeader h={EXTRA_MAGIC,generation,bank_hash(generation,3)};
+  BankHeader h={EXTRA2_MAGIC,generation,bank_hash(generation,4)};
   if(user_erase(offset) || user_erase(8192+offset) ||
      user_write(8192+offset,names_saved,sizeof names_saved) ||
      user_write(8192+offset+sizeof names_saved,tone_bank,sizeof tone_bank) ||

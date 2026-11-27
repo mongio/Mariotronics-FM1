@@ -6,17 +6,23 @@ typedef struct {
   TonePatch tones[PROGRAM_COUNT];
   ExtraPatch extras[PROGRAM_COUNT];   /* zeros in a padded older backup: defaults */
 } BackupBank;
-static BackupBank transfer_bank POOLMEM;
+/* An incoming backup is staged in the tape memory (the loop is erased first):
+   a permanent 6 KB staging copy no longer fits beside the Lab 8 effects. */
+#define transfer_bank (*(BackupBank *)tape)
+_Static_assert(sizeof(BackupBank) <= sizeof tape, "backup staging exceeds the tape memory");
 enum { CHUNK=80, CHUNKS=(sizeof(BackupBank)+CHUNK-1)/CHUNK };
 static unsigned transfer_index, transfer_mode, transfer_generation;
-static void snapshot_bank(void) {
-  transfer_bank.programs=bank;
-  for(int i=0;i<PROGRAM_COUNT;i++){
-    for(int j=0;j<=NAME_LEN;j++)transfer_bank.names[i][j]=names_saved[i][j];
-    transfer_bank.tones[i]=tone_bank[i];
-    transfer_bank.extras[i]=extra_bank[i];
-  }
+/* Export reads the live bank directly, in BackupBank order. */
+static unsigned backup_byte(unsigned at) {
+  if(at<sizeof bank)return ((const unsigned char *)&bank)[at];
+  at-=sizeof bank;
+  if(at<sizeof names_saved)return ((const unsigned char *)names_saved)[at];
+  at-=sizeof names_saved;
+  if(at<sizeof tone_bank)return ((const unsigned char *)tone_bank)[at];
+  at-=sizeof tone_bank;
+  return at<sizeof extra_bank?((const unsigned char *)extra_bank)[at]:0;
 }
+_Static_assert(sizeof(BackupBank)==sizeof bank+sizeof names_saved+sizeof tone_bank+sizeof extra_bank, "backup layout has padding");
 static int valid_backup(void) {
   for(int i=0;i<PROGRAM_COUNT;i++){
     const Patch *p=&transfer_bank.programs.patch[i];
@@ -45,7 +51,7 @@ static int restore_backup(void) {
   const unsigned char *src=(const unsigned char *)&transfer_bank;
   for(unsigned i=0;i<sizeof transfer_bank;i++)hash=(hash^src[i])*16777619u;
   int target=bank_sector==0?1:0;unsigned off=target*4096;
-  BankHeader header={EXTRA_MAGIC,generation,hash};
+  BankHeader header={EXTRA2_MAGIC,generation,hash};
   if(user_erase(off)||user_erase(8192+off)||
      user_write(off+sizeof header,&transfer_bank.programs,sizeof bank)||
      user_write(8192+off,transfer_bank.names,sizeof names_saved)||
@@ -58,7 +64,9 @@ static int restore_backup(void) {
     tone_bank[i]=transfer_bank.tones[i];
     extra_bank[i]=transfer_bank.extras[i];
   }
-  bank_sector=target;bank_generation=generation;recall_program(program);return 1;
+  bank_sector=target;bank_generation=generation;recall_program(program);
+  for(unsigned i=0;i<sizeof transfer_bank/2;i++)tape[i]=0;
+  return 1;
 }
 static void app_sysex(const uint8_t *p,uint32_t n) {
   if(n<3 || p[0]!=0x4d)return;
@@ -69,18 +77,18 @@ static void app_sysex(const uint8_t *p,uint32_t n) {
   unsigned left=idx<CHUNKS?sizeof transfer_bank-idx*CHUNK:0;
   unsigned count=left>CHUNK?CHUNK:left;
 #ifndef DINGHY_HOST
-  if(op>=10 && op<=12){
-    reply[7]=eno_transfer(p,n);reply[len++]=0xf7;sysex_send(reply,len);return;
+  if(op>=10 && op<=16){
+    reply[7]=eno_transfer(p,n,reply,&len);reply[len++]=0xf7;sysex_send(reply,len);return;
   }
 #endif
   if((op==1 || op==3) && n==3 && idx==0){
     transfer_mode=op;transfer_index=0;transfer_generation=bank_generation;
-    if(op==1)snapshot_bank();
+    if(op==3)post(EV_CLEAR,0,0),erase_loop();   /* the tape memory becomes the staging area */
     reply[len++]=CHUNKS;
     reply[len++]=sizeof transfer_bank>>7;reply[len++]=sizeof transfer_bank&127;   /* lets the editor pad an older, shorter backup */
   }else if(op==2 && transfer_mode==1 && count && n==3){
     for(unsigned i=0;i<count;i++){
-      unsigned b=data[idx*CHUNK+i];reply[len++]=b>>4;reply[len++]=b&15;
+      unsigned b=backup_byte(idx*CHUNK+i);reply[len++]=b>>4;reply[len++]=b&15;
     }
   }else if(op==4 && transfer_mode==3 && idx==transfer_index && count && n==3+count*2){
     for(unsigned i=0;i<count;i++){
