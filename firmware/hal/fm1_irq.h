@@ -44,6 +44,7 @@ typedef struct {
     uint32_t etm[4];
     uint32_t early;                          /* consecutive crashes < 3 s after boot */
     uint32_t ctx, shown;                     /* Mariotronics 1.20: the app's state, and whether the report was seen */
+    uint32_t rete, retx, trail[6];           /* 1.20 beta 4: code addresses found on the stack (who called, who was interrupted) */
 } fm1_crash_t;
 static volatile uint32_t fm1_app_ctx;     /* set by the application every frame: page, engine, voice, radio */
 /* Not static: .noinit holds whatever the last run (or power-on) left, and a
@@ -116,6 +117,21 @@ void fm1_fault_c(uint32_t *f)
     fm1_crash.early = fm1_crash.uptime_ms < 3000u ? early + 1u : 0u;
     fm1_crash.ctx = fm1_app_ctx;
     fm1_crash.shown = 0;
+    fm1_crash.rete = f[17];
+    fm1_crash.retx = f[18];
+    {   /* walk up the stack past the fault frame: the first code addresses are return addresses */
+        extern uint32_t _rt_start[], _rt_end[];
+        extern char _etext[], _sstack_top[];
+        const uint32_t *w = f + 26, *top = (const uint32_t *)(uintptr_t)_sstack_top;
+        uint32_t n = 0, k;
+        for (k = 0; k < 6u; k++) fm1_crash.trail[k] = 0;
+        for (k = 0; k < 512u && w < top && n < 6u; k++, w++) {
+            uint32_t v = *w;
+            if ((v >= 0x02000120u && v < (uint32_t)(uintptr_t)_etext) ||
+                (v >= (uint32_t)(uintptr_t)_rt_start && v < (uint32_t)(uintptr_t)_rt_end))
+                fm1_crash.trail[n++] = v;
+        }
+    }
     fm1_fault(&fm1_crash);
     for (;;)
         ;

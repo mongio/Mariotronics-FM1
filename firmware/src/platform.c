@@ -373,20 +373,18 @@ static void hex8(char *b, uint32_t v)
 /* The crash report (1.20): every register the HAL kept, and the app's state at the fault. */
 static void crash_screen(const fm1_crash_t *c, int after_reboot)
 {
-    static const char *const label[8] = {"VEC", "PC", "RETS", "SP", "EMU", "DBG", "ETM", "CTX"};
-    uint32_t v[8] = {c->vec, c->pc, c->rets, c->sp, c->emu, c->dbg, c->etm[0], c->ctx}, i;
-    char b[12], n[12];
+    static const char *const label[12] = {"VEC", "DBG", "PC", "RETS", "RETE", "SP", "CTX", "TIME", "T1", "T2", "T3", "T4"};
+    uint32_t v[12] = {c->vec, c->dbg, c->pc, c->rets, c->rete, c->sp, c->ctx, c->uptime_ms / 1000u,
+                      c->trail[0], c->trail[1], c->trail[2], c->trail[3]}, i;
+    char b[12];
     lcd_fill(0, 0, 240, 240, RGB(160, 0, 0));
-    draw_text_box(0, 6, 240, &FONT_S, APP_NAME " CRASH", C_WHITE, 1);
-    for (i = 0; i < 8u; i++) {
+    draw_text_box(0, 2, 240, &FONT_S, APP_NAME " CRASH", C_WHITE, 1);
+    for (i = 0; i < 12u; i++) {
         hex8(b, v[i]);
-        draw_text_box(14, 30 + i * 20, 70, &FONT_S, label[i], C_WHITE, 0);
-        draw_text_box(90, 30 + i * 20, 140, &FONT_S, b, C_WHITE, 0);
+        draw_text_box(14, 20 + i * 16, 70, &FONT_S, label[i], C_WHITE, 0);
+        draw_text_box(90, 20 + i * 16, 140, &FONT_S, b, C_WHITE, 0);
     }
-    hex8(n, c->uptime_ms / 1000u);
-    draw_text_box(14, 192, 70, &FONT_S, "TIME", C_WHITE, 0);
-    draw_text_box(90, 192, 140, &FONT_S, n, C_WHITE, 0);
-    draw_text_box(0, 216, 240, &FONT_S, after_reboot ? "PHOTO, THEN ANY KEY" : "RESTARTING", C_WHITE, 1);
+    draw_text_box(0, 220, 240, &FONT_S, after_reboot ? "PHOTO, THEN ANY KEY" : "RESTARTING", C_WHITE, 1);
 }
 static void fm1_fault(const fm1_crash_t *c)
 {
