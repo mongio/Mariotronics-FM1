@@ -330,7 +330,7 @@ void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) 
     fm1_audio_ack_aux(p);
     if (p & FM1_AUDIO_HALF) {
         int32_t *o = &abuf[fm1_audio_free_half() * HALF_WORDS];
-        uint32_t i, b, t0 = FM1_T4_CNT, used;
+        uint32_t i, b, t0 = fm1_ticks(), used;
         for (i = 0; i < HALF_WORDS; i++)
             o[i] = 0;
         uac_render_start();
@@ -344,7 +344,7 @@ void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) 
         for (i = 0; i < HALF_WORDS; i++)
             o[i] <<= 7;
         fm1_audio_ack_half();
-        used = (FM1_T4_CNT - t0) * 256u / (HALF_FRAMES * 1000000u / 44100u * FM1_TICKS_PER_US);
+        used = (fm1_ticks() - t0) * 256u / (HALF_FRAMES * 1000000u / 44100u * FM1_TICKS_PER_US);
         audio_load_q8 = used;
         if (used > audio_load_peak_q8) audio_load_peak_q8 = used;
     }
