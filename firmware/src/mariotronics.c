@@ -2322,7 +2322,7 @@ static void app_step(void) {
   air_step(voice_kind()==AIR || knob[UNCERT][0],fm1_ms);
   latch_keys=latched_keys();
   update_leds(keys|latch_keys);
-  if(globals_changed && fm1_ms-light_changed>=600u) {
+  if(globals_changed && fm1_ms-light_changed>=2000u) {   /* 1.20: after 2 s of quiet, one page program */
     if(!settings_save(globals,sizeof globals)) globals_changed=0;
     light_changed=fm1_ms;
   }

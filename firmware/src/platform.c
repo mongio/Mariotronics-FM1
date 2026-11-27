@@ -160,29 +160,63 @@ static uint32_t crc32(const uint8_t *p, uint32_t n)
     }
     return ~c;
 }
+/* 1.20: small settings (<= 16 bytes) are appended as 32-byte records into the sector, so a save is one page
+ * program (about a millisecond with the interrupts off) and the sector is erased only once every 128 saves.
+ * The erase stops the sound and the key scan for 40 ms on a Puya chip and up to 0.6 s on a UC25HQ80: it used to
+ * happen on every save. The older single record (header DNGY at 0) is still read. */
+#define SETTINGS_LOG_MAGIC 0x324C544Du          /* "MTL2" */
+typedef struct { uint32_t magic, seq, n, crc; uint8_t data[16]; } settings_rec_t;
+static int settings_scan(uint32_t n, settings_rec_t *best, uint32_t *free_at)   /* 1: a record of size n found */
+{
+    settings_rec_t r;
+    uint32_t off, found = 0;
+    *free_at = 0x1000u;
+    for (off = 0; off < 0x1000u; off += sizeof r) {
+        const uint32_t *w = (const uint32_t *)&r;
+        uint32_t k, blank = 1;
+        if (st_read(SETTINGS_AT + off, &r, sizeof r)) return 0;
+        for (k = 0; k < sizeof r / 4u; k++) if (w[k] != 0xFFFFFFFFu) blank = 0;
+        if (blank) { if (*free_at == 0x1000u) *free_at = off; continue; }
+        *free_at = 0x1000u;                       /* only blank slots after the last used one count */
+        if (r.magic == SETTINGS_LOG_MAGIC && r.n == n && n <= 16u && crc32(r.data, n) == r.crc && (!found || r.seq > best->seq)) {
+            *best = r;
+            found = 1;
+        }
+    }
+    return (int)found;
+}
 static int settings_load(void *p, uint32_t n)   /* 0: loaded; else p is untouched */
 {
     static uint8_t buf[SETTINGS_MAX];
-    uint32_t h[3];
-    if (!flash_ok || n > sizeof buf || st_read(SETTINGS_AT, h, sizeof h) || h[0] != SETTINGS_MAGIC || h[1] != n)
+    uint32_t h[3], free_at;
+    settings_rec_t r;
+    if (!flash_ok || n > sizeof buf)
+        return -1;
+    if (n <= 16u && settings_scan(n, &r, &free_at)) { memcpy(p, r.data, n); return 0; }
+    if (st_read(SETTINGS_AT, h, sizeof h) || h[0] != SETTINGS_MAGIC || h[1] != n)
         return -1;
     if (st_read(SETTINGS_AT + sizeof h, buf, n) || crc32(buf, n) != h[2])
         return -1;
     memcpy(p, buf, n);
     return 0;
 }
-static int settings_save(const void *p, uint32_t n)   /* p in RAM, n <= SETTINGS_MAX */
+static int settings_save(const void *p, uint32_t n)   /* p in RAM, n <= 16 */
 {
-    uint32_t h[3] = {SETTINGS_MAGIC, n, 0}, took;
+    settings_rec_t r, last;
+    uint32_t free_at, took, seq = 1;
     int rc;
-    if (!flash_ok || n > SETTINGS_MAX)
+    if (!flash_ok || n > 16u)
         return -1;
-    h[2] = crc32(p, n);
-    if ((rc = fl_erase4k(SETTINGS_AT, &took)) != 0)
-        return rc;
-    if ((rc = fl_write(SETTINGS_AT + sizeof h, p, n)) != 0)
-        return rc;
-    return fl_write(SETTINGS_AT, (const uint8_t *)h, sizeof h);   /* the header last: a cut save stays invalid */
+    if (settings_scan(n, &last, &free_at)) seq = last.seq + 1u;
+    if (free_at >= 0x1000u) {                     /* full (or the old format): erase, once in 128 saves */
+        if ((rc = fl_erase4k(SETTINGS_AT, &took)) != 0) return rc;
+        free_at = 0;
+    }
+    memset(&r, 0xFF, sizeof r);
+    r.magic = SETTINGS_LOG_MAGIC; r.seq = seq; r.n = n; r.crc = crc32(p, n);
+    memcpy(r.data, p, n);
+    if ((rc = fl_write(SETTINGS_AT + free_at + 4u, (const uint8_t *)&r + 4, sizeof r - 4u)) != 0) return rc;
+    return fl_write(SETTINGS_AT + free_at, (const uint8_t *)&r, 4u);   /* the magic last: a cut save stays invalid */
 }
 
 /* ---- the user area (GRANA: the presets): 16 KiB, read anywhere in it, erased a 4 KiB sector at a time (the
