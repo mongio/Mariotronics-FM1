@@ -2,25 +2,26 @@
 
 Mariotronics turns the FM-1 into a playable guitar and tape-delay instrument inspired by Frippertronics. On power-up, the MTXT logo sits inside the left reel while a yellow cursor makes two passes around the feedback loop. The lowercase italic *mariotronics* title fades in beneath it. Two animated Revox A77s show the tape moving between the record and playback heads.
 
-**1.18 pre-release · Tested in emulation.** Installation, audio performance and BLE pairing on a physical FM-1 await verification.
+**1.19 · Tested in emulation.** Four controls on every page, new ENO, RILEY, RADIGUE and STOCKHAUSEN options, LFO 2, a stereo ensemble and replaceable piano samples. FRIPP is unchanged. See the [release notes](RELEASE-NOTES.md).
 
 ## Try it
 
-[Download the standalone editor and emulator (ZIP)](https://raw.githubusercontent.com/mongio/Mariotronics-FM1/main/downloads/Mariotronics_FM1_1_18.zip). Extract the ZIP, open **Mariotronics_1_18.html** in desktop Chrome or Edge and click **Power on**. The emulator works offline. Hold REC for 1.2 seconds to erase the tape. Powering off clears the tape in RAM.
+[Download the standalone editor and emulator (ZIP)](https://raw.githubusercontent.com/mongio/Mariotronics-FM1/main/downloads/Mariotronics_FM1_1_19.zip). Extract the ZIP, open **Mariotronics_1_19.html** in desktop Chrome or Edge and click **Power on**. The emulator works offline. Hold REC for 1.2 seconds to erase the tape. Powering off clears the tape in RAM.
 
 ## Install on FM-1
 
-Connect one powered FM-1 with a USB data cable. Open the downloaded editor, select **Install Mariotronics**, and grant MIDI SysEx access. Installation replaces the existing firmware. Leave power and USB connected until the editor reports **Installed · FM-1_868**.
+Connect one powered FM-1 with a USB data cable. Open the downloaded editor, select **Install Mariotronics**, and grant MIDI SysEx access. Installation replaces the existing firmware. Back up your presets first with **Export preset bank**. Leave power and USB connected until the editor reports **FM-1_878**.
 
-[Download the firmware package](https://github.com/mongio/Mariotronics-FM1/raw/refs/heads/main/downloads/mariotronics-1.18.fwsc).
+[Download the firmware package](https://github.com/mongio/Mariotronics-FM1/raw/refs/heads/main/downloads/mariotronics-1.19.fwsc).
 
 ## Play
 
 - **EDIT** opens Instrument and selects the voice for the current algorithm.
-- **LFO** sets vibrato rate, depth, delay and rise. **ARP** alternates two held notes with a 3+3+2 accent.
+- **LFO** sets vibrato rate, depth, delay and rise. Press again for LFO 2, the Wi-Fi source and its two routes. **ARP** alternates two held notes with a 3+3+2 accent; in ENO, RILEY and RADIGUE press ARP again for ARP FEEL (swing, accent, human, repeat).
+- Hold **HOME** for one second for keyboard HOLD. On KEYS, Hold Key chooses RESTART or RELEASE for a held note pressed again.
 - **REC** records and overdubs. **SEQ** toggles reverse on a recorded loop. **REC** holds or resumes overdubbing on a recorded loop. HOME K1 sets Tape Delay. ALGORITHM selects FRIPP, ENO, RILEY or RADIGUE. RILEY layers sustained Organ or Reed voices through the shared tape feedback loop and displays the vintage decks. ENO shows a moving signal diagram.
-- **FX** opens compression, fuzz, wah, amplifier and stereo plate. The plate follows the tape return, so its tail stays out of the recording.
-- **GLO** opens Tape Character. Press again for Tape Speed, Erase Head, then MIDI, BLE MIDI and Lights. The editor includes the CC assignments and transport instructions.
+- **FX** opens compression, fuzz, wah, amplifier, EQ, filter, ENSEMBLE (ensemble, chorus, phaser, flanger), off-tape monitor and stereo plate. The plate follows the tape return, so its tail stays out of the recording.
+- **GLO** opens Tape Character. Press again for Tape Speed, Erase Head, then MIDI, BLE MIDI and Keys. The editor includes the CC assignments and transport instructions.
 
 [Build instructions](MARIOTRONICS.md) · [License](LICENSE) · [Third-party credits](LICENSING.md)
 
@@ -43,6 +44,10 @@ EDIT shows a triggered pre-effects voice scope. TAPE CHARACTER shows output VU a
 In 1.5, EDIT adds Rhodes and Bowed Glass to ENO, and Reed Organ and Harmonium Drone to RILEY. ENO acoustic and bright pianos use two velocity layers rendered from coupled stiff strings and hammer contact. GLO has cream vintage meter faces. Moving HOME K1 during internal tape playback bends the return. From HOME turn SELECT left once to reach ERASE. K1 ALL keeps the 1.2-second whole-tape erase. For RANGE arm K2, then hold REC over the moving tape and release to disarm.
 
 **Tape Speed.** On the second GLOBAL page, K1 changes the transport speed. K2 selects STEP (4.75, 9.5, 19 and 38 cm/s) or VAR for fine adjustment. At 9.5 cm/s a loop recorded at 19 cm/s plays an octave lower and lasts twice as long. The live instrument keeps its tuning.
+
+## Version 1.19
+
+Every page has four controls. ENO Glass, Choir, Rhodes and Bowed Glass add Octave and Sympathetic; RILEY adds Percussion and Leslie; RADIGUE adds Sub and Drift; STOCKHAUSEN adds a RING MOD page. LFO 2 and the ENSEMBLE page animate pads. The editor's Piano samples page sets each of the twelve piano recordings to Factory, Sustain or your own file. Details in [RELEASE-NOTES.md](RELEASE-NOTES.md).
 
 ## Version 1.18
 
