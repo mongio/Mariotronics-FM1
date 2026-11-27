@@ -189,6 +189,42 @@ static void ring_view(void){
   }
   lettering(120,128,excite[knob[RING][2]],silver,0);
 }
+/* MATRIX (RADIGUE): the four routings, the selected one lit, each with its live value. */
+static void matrix_view(void){
+  lettering(120,4,"MODULATION MATRIX",gold,0);
+  for(int i=0;i<4;i++){
+    const MatrixSlot *m=&mtx.slot[i];
+    int y=30+i*24,sel=knob[MATRIX][0]==i,on=m->dst && m->amount;
+    uint16_t c=sel?gold:on?silver:metal;
+    char t[4]={(char)('1'+i),0};
+    lettering(16,y,t,c,0);
+    lettering(62,y,on||sel?mtx_src_name[m->src&3]:"-",c,0);
+    lettering(150,y,mtx_dst_name[bound(m->dst,0,MT_COUNT-1)],c,0);
+    int live=on?mtx.voice[0][(int)m->dst]:0;
+    cv_rect(196,y+7,36,2,metal);
+    if(on){int w=live*16/127;cv_rect(w<0?214+w:214,y+4,w<0?-w:w+1,8,sel?gold:RGB(150,128,90));}
+    if(sel)aa_line(30*16,(y+16)*16,96*16,(y+16)*16,12,gold);
+  }
+  lettering(120,128,knob[SOUND][2]==3?"RADIGUE  /  K1 SLOT":"RADIGUE ONLY",silver,0);
+}
+/* MATRIX LFO: LFO A and LFO B as traces, and the four voices placed by Spread. */
+static void mlfo_view(void){
+  lettering(120,4,"MATRIX LFO",gold,0);
+  int tri=knob[MLFO][3],spread=knob[MLFO][2],la=0,lb=0;
+  for(int x=0;x<=200;x+=2){
+    unsigned ph=(unsigned)x*21474836u+mtx.phase_a;
+    int a=tri?(ph<0x80000000u?(int)(ph>>23)-128:383-(int)(ph>>23)):sinus(ph);
+    int ya=50-a*16/127,yb=100-(sinus((unsigned)x*9000000u+mtx.phase_b)+sinus((unsigned)x*23000000u+mtx.phase_b*3u)/2)*12/190;
+    if(x){aa_line((18+x)*16,la*16,(20+x)*16,ya*16,24,gold);aa_line((18+x)*16,lb*16,(20+x)*16,yb*16,20,RGB(150,128,90));}
+    la=ya;lb=yb;
+  }
+  for(int v=0;v<4;v++){
+    unsigned pa=mtx.phase_a+(unsigned)(spread*v)*0x10000000u;
+    int a=tri?(pa<0x80000000u?(int)(pa>>23)-128:383-(int)(pa>>23)):sinus(pa);
+    aa_disc((24+v*8)*16,(50-a*16/127)*16,3*16,silver,256);
+  }
+  lettering(120,128,"A  SINE / TRI      B  RANDOM",silver,0);
+}
 static void instrument_diagram(void){
   int kind=voice_kind(),a=knob[TIMBRE][0],b=knob[TIMBRE][1];
   if(page==HEAD2 || page==NOTE_FX){

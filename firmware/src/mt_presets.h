@@ -28,6 +28,9 @@ static const unsigned char spaces[][8] = {
 };
 
 enum { NAME_LEN=16, EMPTY_SLOT=2 };
+#include "mt_factory.h"
+/* 1.20: P01-P08 the eight FRIPP tones on Tape, P09-P16 each tone with another space. */
+static int factory_space(int slot){return slot<8?0:1+(slot%8)%7;}
 static char names_saved[PROGRAM_COUNT][NAME_LEN+1], draft[NAME_LEN+1];
 static int naming, destination, cursor, deleting;
 static unsigned name_seed=937u;
@@ -40,7 +43,8 @@ static void copy_name(char *dst,const char *src) {
 static void slot_name(int slot,char *dst) {
   if(names_saved[slot][0]) {copy_name(dst,names_saved[slot]); return;}
   if(bank.custom[slot]==EMPTY_SLOT) {copy_name(dst,"Empty");return;}
-  const char *tone=tone_names[slot%8], *space=space_names[slot/8];
+  if(slot>=16){copy_name(dst,factory[slot-16].name);return;}   /* 1.20: P17-P64 use the other engines */
+  const char *tone=tone_names[slot%8], *space=space_names[factory_space(slot)];
   while(*tone) *dst++=*tone++;
   *dst++=' ';
   copy_name(dst,space);
@@ -145,13 +149,40 @@ typedef struct { unsigned char tag, swing, accent, human, repeats, target_a, tar
 enum { EXTRA_TAG=0xA7 };
 static ExtraPatch extra_bank[PROGRAM_COUNT] POOLMEM, extra_working[5] POOLMEM;
 static const ExtraPatch no_extra;
+/* 1.20: the RADIGUE MATRIX rides in the unused high bits of the Lab 7/8 record (50 bits), so
+   banks and backups keep their size. All zero bits recall an empty matrix with default LFOs. */
+static const unsigned char mtx_bits_at[10][3]={{1,6,2},{2,2,6},{3,7,1},{4,3,5},{5,4,4},{6,4,4},{8,4,4},{29,0,8},{30,0,8},{31,0,8}};
+static void mtx_pack(ExtraPatch *e){
+  unsigned long long v=0;int n=0;
+  for(int i=0;i<4;i++){const MatrixSlot *m=&mtx.slot[i];
+    v|=(unsigned long long)(m->src&3)<<n;n+=2;v|=(unsigned long long)(m->dst&15)<<n;n+=4;v|=(unsigned long long)(m->amount&15)<<n;n+=4;}
+  v|=(unsigned long long)((knob[MLFO][0]^3)&7)<<n;n+=3;v|=(unsigned long long)((knob[MLFO][1]^2)&7)<<n;n+=3;
+  v|=(unsigned long long)((knob[MLFO][2]^2)&7)<<n;n+=3;v|=(unsigned long long)(knob[MLFO][3]&1)<<n;
+  unsigned char *b=(unsigned char *)e;
+  for(int f=0;f<10;f++){unsigned at=mtx_bits_at[f][0],lo=mtx_bits_at[f][1],w=mtx_bits_at[f][2],mask=((1u<<w)-1u)<<lo;
+    b[at]=(unsigned char)((b[at]&~mask)|((unsigned)(v&((1u<<w)-1u))<<lo));v>>=w;}
+}
+static void mtx_unpack(const ExtraPatch *e){
+  unsigned long long v=0;int n=0;const unsigned char *b=(const unsigned char *)e;
+  if(e && e->tag==EXTRA_TAG)for(int f=0;f<10;f++){unsigned at=mtx_bits_at[f][0],lo=mtx_bits_at[f][1],w=mtx_bits_at[f][2];
+    v|=(unsigned long long)((b[at]>>lo)&((1u<<w)-1u))<<n;n+=w;}
+  for(int i=0;i<4;i++){MatrixSlot *m=&mtx.slot[i];int a;
+    m->src=(signed char)(v&3);v>>=2;m->dst=(signed char)bound((int)(v&15),0,MT_COUNT-1);v>>=4;a=(int)(v&15);v>>=4;m->amount=(signed char)bound(a>7?a-16:a,-7,7);}
+  knob[MLFO][0]=(int)((v&7)^3);v>>=3;knob[MLFO][1]=(int)((v&7)^2);v>>=3;knob[MLFO][2]=(int)((v&7)^2);v>>=3;knob[MLFO][3]=(int)(v&1);
+  { const MatrixSlot *m=&mtx.slot[knob[MATRIX][0]&3];knob[MATRIX][1]=m->src;knob[MATRIX][2]=m->dst;knob[MATRIX][3]=m->amount; }
+}
 static void capture_extra(ExtraPatch *e) {
   e->tag=EXTRA_TAG;e->swing=knob[FEEL][0];e->accent=knob[FEEL][1];e->human=knob[FEEL][2];e->repeats=knob[FEEL][3];
   e->target_a=knob[ROUTE][0];e->target_b=knob[ROUTE][2];e->amount_b=(signed char)knob[ROUTE][3];
   e->arp_slow=knob[ARP][1]<3?(unsigned char)(3-knob[ARP][1]):0;   /* the patch keeps 3 Hz */
   capture_more(e->more);
+  mtx_pack(e);
 }
-static void apply_extra(const ExtraPatch *e) {
+static void apply_extra(const ExtraPatch *src) {
+  ExtraPatch clean=*src,*e=&clean;
+  mtx_unpack(src);
+  clean.swing&=63;clean.accent&=3;clean.human&=127;clean.repeats&=7;clean.target_a&=15;clean.target_b&=15;clean.arp_slow&=15;
+  clean.more[20]=clean.more[21]=clean.more[22]=0;
   if(e->tag!=EXTRA_TAG){knob[FEEL][0]=0;knob[FEEL][1]=1;knob[FEEL][2]=0;knob[FEEL][3]=1;knob[ROUTE][2]=4;knob[ROUTE][3]=0;apply_more(0);return;}
   knob[FEEL][0]=bound(e->swing,0,50);knob[FEEL][1]=bound(e->accent,0,3);knob[FEEL][2]=bound(e->human,0,100);knob[FEEL][3]=bound(e->repeats,1,4);
   knob[ROUTE][0]=bound(e->target_a,0,10);knob[ROUTE][2]=bound(e->target_b,0,10);knob[ROUTE][3]=bound(e->amount_b,-100,100);
@@ -239,6 +270,7 @@ static void switch_engine(int next) {
   knob[SOUND][2]=next;
   if(!working_valid[next] && new_timbre_kind(voice_kind()))knob[TIMBRE][2]=knob[TIMBRE][3]=0;   /* Lab 8 extras start off */
   if(page==RING && next!=4)page=TIMBRE;
+  if((page==MATRIX || page==MLFO) && next!=3)page=LFO2;
   if(page==PICK_ART && next!=0)page=ARP;
   if(page==FEEL && (next==0 || next==4))page=ARP;
   if((page==NOTE_FX || page==HEAD2) && next!=1)page=SOUND;
@@ -248,6 +280,18 @@ static void switch_engine(int next) {
 #endif
 }
 
+static void apply_factory(const FactoryProgram *f){
+  if(f->engine)switch_engine(f->engine);           /* the engine's own starting point (nothing is valid yet) */
+  knob[SOUND][0]=f->voice;
+  if(new_timbre_kind(voice_kind()))knob[TIMBRE][2]=knob[TIMBRE][3]=0;
+  for(int i=0;i<f->count;i++){
+    int pg=f->ops[3*i],k=f->ops[3*i+1],v=f->ops[3*i+2];
+    if(pg>=200){MatrixSlot *m=&mtx.slot[(pg-200)&3];if(k==0)m->src=(signed char)v;else if(k==1)m->dst=(signed char)v;else m->amount=(signed char)v;continue;}
+    if(pg<PAGE_COUNT && k<4)knob[pg][k]=bound(v,minimum[pg][k],pg==ARP && !k && knob[SOUND][2]?4:maximum[pg][k]);
+  }
+  if(knob[SOUND][2] && knob[LFO][0])knob[ART][3]=knob[LFO][0];
+  { const MatrixSlot *m=&mtx.slot[knob[MATRIX][0]&3];knob[MATRIX][1]=m->src;knob[MATRIX][2]=m->dst;knob[MATRIX][3]=m->amount; }
+}
 static void recall_program(int slot) {
   if(latch_armed)release_hold(fm1_in.notes);
   naming=0;
@@ -258,8 +302,9 @@ static void recall_program(int slot) {
   working_valid[0]=working_valid[1]=working_valid[2]=working_valid[3]=working_valid[4]=0;
   apply_patch(&p);apply_tone(bank.custom[slot]==1?&tone_bank[slot]:&neutral_tone);
   apply_extra(bank.custom[slot]==1?&extra_bank[slot]:&no_extra);
-  if (!bank.custom[slot]) {
-    const unsigned char *t=tones[slot%8], *s=spaces[slot/8];
+  if (!bank.custom[slot] && slot>=16) apply_factory(&factory[slot-16]);
+  else if (!bank.custom[slot]) {
+    const unsigned char *t=tones[slot%8], *s=spaces[factory_space(slot)];
     knob[SOUND][0]=t[0]; knob[SOUND][1]=t[1]; knob[FUZZ][0]=t[2]; knob[FUZZ][3]=t[3];
     knob[AMP][0]=t[4]; knob[AMP][2]=t[5]; knob[WAH][3]=t[6];
     knob[ENV][0]=s[0]; knob[HOME][1]=s[1]; knob[HOME][0]=10*s[2];
@@ -270,6 +315,7 @@ static void recall_program(int slot) {
   irq_restore(flags);
 #endif
   if(page==PICK_ART && knob[SOUND][2]!=0)page=ARP;
+  if((page==MATRIX || page==MLFO) && knob[SOUND][2]!=3)page=LFO2;
   if((page==NOTE_FX || page==HEAD2) && knob[SOUND][2]!=1)page=SOUND;
   if((page==TIMBRE || page==MOTION) && !knob[SOUND][2])page=SOUND;
   program=slot;
