@@ -23,7 +23,7 @@
 #include "mt_art.h"
 #include "platform.c"
 #include "mt_ble.h"
-#define MT_BUILD "1.20 b7"   /* shown at start-up and on the MIDI page */
+#define MT_BUILD "1.20"   /* shown at start-up and on the MIDI page */
 #include "mt_intro.h"
 #include "mt_piano.h"
 #include "mt_eno_bank.h"

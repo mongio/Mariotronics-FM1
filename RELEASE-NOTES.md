@@ -1,5 +1,21 @@
 # Mariotronics release notes
 
+## 1.20 (FM-1_879)
+
+Seven test builds (1.20 beta 1–7) lead to this release. FRIPP sounds as before.
+
+* **Stability.** Turning on Wi-Fi starts the radio's Bluetooth side; its interrupts now stay off while Bluetooth is off. They could corrupt the stack and restart the FM-1 with a red screen. Global settings (wow, flutter, speed, keys…) are appended to flash instead of erasing a sector on every save: no more crackle, dimmed key lights or freezes while turning global controls.
+* **CPU meter and load governor.** The MIDI page shows the version and the audio load. Above 85 % the oldest voice is released; above 95 % the ensemble pauses. Heavy patches click instead of freezing.
+* **Crash report.** If the FM-1 ever faults, the report (registers, stack trail, page, engine, voice, Wi-Fi) stays on screen after the restart until a key is pressed.
+* **ENO:** Bright Piano removed (programs that used it play the Piano); a new Rhodes (exponential tine decay, inharmonic attack, pickup bark that grows with velocity); three dark pads, ABYSS, NOCTURNE and UMBRA. Voice order on K1: Piano, Rhodes, Glass, Choir, Bowed Glass, Evening Glass, Dusk Choir, Tidal Haze, Abyss, Nocturne, Umbra.
+* **RADIGUE modulation matrix** (LFO, after LFO 2): four routings from LFO A, LFO B (smooth random), Wi-Fi or note age to Beat, Color, Sub, Drift, Pitch, Level, Filter, Plate or Tape; MATRIX LFO sets both rates (0.005–2 Hz), Spread across the four voices and shape. Saved in programs.
+* **PRE/POST.** ENSEMBLE Type: ensemble, chorus, phaser, flanger before or after the tape. FILTER Type: LP, HP or off, PRE or POST; EQ and filter move together. POST effects are heard but not recorded.
+* **Engine changes keep the post-loop chain:** plate, tape delay, feedback and return, the second head, and ensemble, EQ and filter when set to POST.
+* **OFF-TAPE** is now a global tape setting, in the GLO cycle after ERASE.
+* **Factory bank across the engines:** P01–P16 FRIPP, P17–P32 ENO, P33–P40 RILEY, P41–P52 RADIGUE with the matrix, P53–P60 STOCKHAUSEN, P61–P64 studies. Programs you saved are unchanged.
+* **Piano samples:** the FM-1 shows RECEIVING SAMPLES with progress and the result; keys and saves wait during the transfer, and the editor resends a piece whose answer is lost.
+* **Display:** a Revox A77 style TAPE SPEED knob drawn on the panel; the version at start-up.
+
 ## 1.19 (FM-1_878)
 
 The test builds ENO Studio Lab 5–7 lead to this release; the name is no longer used.
